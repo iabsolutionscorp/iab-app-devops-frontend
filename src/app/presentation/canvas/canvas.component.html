@@ -1,48 +1,47 @@
 <div class="canvas-container">
   <div class="controls">
-    <!-- Ícone PNG para DESENHAR tracejado -->
     <button
       class="icon-btn"
       (click)="toggleDashedMode()"
       [class.active]="drawMode && lineStyle === 'dashed'"
+      title="Desenhar tracejado"
     >
-      <img
-        src="canva/linha-tracejada.png"
-        alt="Tracejado"
-        class="icon-btn-img"
-      />
+      <img src="canva/linha-tracejada.png" alt="Tracejado" class="icon-btn-img" />
     </button>
 
-    <!-- Ícone PNG para DESENHAR sólido -->
     <button
       class="icon-btn"
       (click)="toggleSolidMode()"
       [class.active]="drawMode && lineStyle === 'solid'"
+      title="Desenhar sólido"
     >
-      <img
-        src="canva/linha-diagonal.png"
-        alt="Sólido"
-        class="icon-btn-img"
-      />
+      <img src="canva/linha-diagonal.png" alt="Sólido" class="icon-btn-img" />
     </button>
 
-    <!-- Ícone PNG para APAGAR linha -->
     <button
       class="icon-btn"
       (click)="toggleDeleteMode()"
       [class.active]="deleteMode"
+      title="Apagar linha"
     >
-      <img
-        src="canva/borracha.png"
-        alt="Apagar"
-        class="icon-btn-img"
-      />
+      <img src="canva/borracha.png" alt="Apagar linha" class="icon-btn-img" />
+    </button>
+
+    <!-- Botão para apagar serviços -->
+    <button
+      class="icon-btn"
+      (click)="toggleServiceDeleteMode()"
+      [class.active]="serviceDeleteMode"
+      title="Apagar serviço"
+    >
+      <img src="canva/lixeira.png" alt="Apagar serviço" class="icon-btn-img" />
     </button>
   </div>
 
   <div
     #canvasRef
     class="canvas"
+    [class.service-delete-mode]="serviceDeleteMode"
     cdkDropList
     id="canvas-drop"
     [cdkDropListConnectedTo]="['palette-drop']"
@@ -51,7 +50,6 @@
   >
     <svg class="connections">
       <ng-container *ngFor="let conn of connections; let i = index">
-        <!-- Hit-area para clique -->
         <line
           class="hit-area"
           (click)="onLineClick(i)"
@@ -60,7 +58,6 @@
           [attr.x2]="conn.x2"
           [attr.y2]="conn.y2"
         />
-        <!-- Linha visível: adiciona classe dashed ou solid -->
         <line
           class="visible-line"
           [ngClass]="conn.style"
@@ -77,6 +74,7 @@
       *ngFor="let svc of droppedServices; let i = index"
       #nodeElem
       [ngStyle]="{ left: svc.x + 'px', top: svc.y + 'px' }"
+      (click)="onServiceClick(i, $event)"
       (mousedown)="startNodeDrag(i, $event)"
     >
       <img [src]="svc.icon" class="node-icon" />

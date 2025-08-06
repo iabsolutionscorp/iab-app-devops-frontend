@@ -52,7 +52,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   // Modos mutuamente exclusivos
   drawMode = false;
-  deleteMode = false;
+  deleteMode = false;          // apaga linhas
+  serviceDeleteMode = false;   // apaga serviços
   lineStyle: 'dashed' | 'solid' | null = null;
   private drawStartPoint: { x: number; y: number } | null = null;
 
@@ -69,36 +70,48 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   /** Ativa/desativa modo TRACEJADO */
   toggleDashedMode() {
-    if (this.drawMode && this.lineStyle === 'dashed') {
-      this.drawMode = false;
-      this.lineStyle = null;
-    } else {
-      this.drawMode = true;
+    this.drawMode = !(this.drawMode && this.lineStyle === 'dashed');
+    if (this.drawMode) {
       this.deleteMode = false;
+      this.serviceDeleteMode = false;
       this.lineStyle = 'dashed';
-      this.drawStartPoint = null;
+    } else {
+      this.lineStyle = null;
     }
+    this.drawStartPoint = null;
   }
 
   /** Ativa/desativa modo SÓLIDO */
   toggleSolidMode() {
-    if (this.drawMode && this.lineStyle === 'solid') {
-      this.drawMode = false;
-      this.lineStyle = null;
-    } else {
-      this.drawMode = true;
+    this.drawMode = !(this.drawMode && this.lineStyle === 'solid');
+    if (this.drawMode) {
       this.deleteMode = false;
+      this.serviceDeleteMode = false;
       this.lineStyle = 'solid';
-      this.drawStartPoint = null;
+    } else {
+      this.lineStyle = null;
     }
+    this.drawStartPoint = null;
   }
 
-  /** Ativa/desativa modo EXCLUSÃO */
+  /** Ativa/desativa modo APAGAR LINHAS */
   toggleDeleteMode() {
     this.deleteMode = !this.deleteMode;
     if (this.deleteMode) {
       this.drawMode = false;
+      this.serviceDeleteMode = false;
       this.lineStyle = null;
+    }
+  }
+
+  /** Ativa/desativa modo APAGAR SERVIÇOS */
+  toggleServiceDeleteMode() {
+    this.serviceDeleteMode = !this.serviceDeleteMode;
+    if (this.serviceDeleteMode) {
+      this.drawMode = false;
+      this.deleteMode = false;
+      this.lineStyle = null;
+      this.drawStartPoint = null;
     }
   }
 
@@ -140,8 +153,17 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.droppedServices.push({ ...data, x, y });
   }
 
+  /** Clique sobre um nó para apagar (em serviceDeleteMode) */
+  onServiceClick(idx: number, evt: MouseEvent) {
+    if (!this.serviceDeleteMode) return;
+    evt.stopPropagation();
+    this.droppedServices.splice(idx, 1);
+  }
+
   /** Inicia drag manual de um nó */
   startNodeDrag(i: number, evt: MouseEvent) {
+    if (this.serviceDeleteMode) return;
+
     evt.preventDefault();
     this.draggingIndex = i;
     const nodeRect = (evt.target as HTMLElement)

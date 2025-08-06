@@ -43,7 +43,7 @@
   border-radius: 8px;
   padding: 1rem;
   overflow: auto;
-box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .terraform-wrapper {
