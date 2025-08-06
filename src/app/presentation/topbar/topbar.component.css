@@ -14,61 +14,61 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+}
 
-  .logo {
-    font-weight: 800;
-    font-size: 1.3rem;
-    color: #000;
-    line-height: 1;
-  }
+.topbar-left .logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: #000;
+  line-height: 1;
+}
 
-  .divider {
-    height: 24px;
-    width: 1px;
-    background-color: #ccc;
-    display: inline-block;
-  }
+.topbar-left .divider {
+  height: 24px;
+  width: 1px;
+  background-color: #ccc;
+  display: inline-block;
+}
 
-  .project-name {
-    font-size: 0.95rem;
-    color: #555;
-    line-height: 1;
-  }
+.topbar-left .project-name {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
 
-  button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding: 0.5rem 0.9rem;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
+.topbar-right button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
 
-  .template-btn {
-    background-color: #e8f0fe;
-    color: #1a73e8;
-  }
+.topbar-right .template-btn {
+  background-color: #e8f0fe;
+  color: #1a73e8;
+}
 
-  .new-arch-btn {
-    background-color: #1a73e8;
-    color: white;
-  }
+.topbar-right .new-arch-btn {
+  background-color: #1a73e8;
+  color: white;
+}
 
-  .avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #ddd;
-  }
+.topbar-right .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ddd;
 }

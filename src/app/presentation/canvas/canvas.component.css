@@ -34,13 +34,14 @@
   box-sizing: border-box;
   overflow: hidden;
   cursor: crosshair;
-
-  /* cor de fundo base */
   background-color: #f5f5f5;
-
-  /* dots grid */
   background-image: radial-gradient(#ccc 1px, transparent 1px);
   background-size: 20px 20px;
+}
+
+.canvas.service-delete-mode {
+  /* opcional: muda cursor para mostrar modo excluir */
+  cursor: pointer;
 }
 
 .connections {

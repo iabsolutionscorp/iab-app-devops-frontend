@@ -162,7 +162,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   /** Inicia drag manual de um nó */
   startNodeDrag(i: number, evt: MouseEvent) {
-    if (this.serviceDeleteMode) return;
+    if (this.serviceDeleteMode) return;  // impede drag no modo excluir serviço
 
     evt.preventDefault();
     this.draggingIndex = i;
@@ -200,5 +200,19 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.draggingIndex = null;
     this.subs.unsubscribe();
     this.subs = new Subscription();
+  }
+
+  /**
+   * Limpa tudo: serviços, conexões e modos.
+   * Chame este método quando o Topbar emitir `newArchitecture`.
+   */
+  public clearAll() {
+    this.droppedServices = [];
+    this.connections = [];
+    this.drawMode = false;
+    this.deleteMode = false;
+    this.serviceDeleteMode = false;
+    this.lineStyle = null;
+    this.drawStartPoint = null;
   }
 }

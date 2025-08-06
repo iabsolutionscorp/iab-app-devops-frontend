@@ -1,20 +1,24 @@
 <div class="workspace">
-  <!-- Topbar -->
-  <app-topbar class="topbar-wrapper" />
+  <!-- Topbar com listener no evento newArchitecture -->
+  <app-topbar
+    class="topbar-wrapper"
+    (newArchitecture)="onNewArchitecture()"
+  ></app-topbar>
 
   <!-- Corpo principal -->
   <div class="body">
     <div class="sidebar">
-      <app-service-palette />
+      <app-service-palette></app-service-palette>
     </div>
 
     <div class="main-content">
       <div class="canvas-wrapper">
-        <app-canvas />
+        <!-- canvas com template ref para o ViewChild -->
+        <app-canvas #canvas></app-canvas>
       </div>
 
       <div class="terraform-wrapper">
-        <app-terraform-preview />
+        <app-terraform-preview></app-terraform-preview>
       </div>
     </div>
   </div>
