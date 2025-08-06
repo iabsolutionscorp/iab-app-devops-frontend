@@ -1,0 +1,24 @@
+.tf-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tf-preview h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.tf-textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}

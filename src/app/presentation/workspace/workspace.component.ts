@@ -4,6 +4,7 @@ import { ServicePaletteComponent } from '../service-palette/service-palette.comp
 import { CanvasComponent } from '../canvas/canvas.component';
 import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
 
+
 @Component({
   selector: 'app-workspace',
   standalone: true,

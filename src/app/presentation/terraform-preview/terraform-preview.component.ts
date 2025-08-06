@@ -1,11 +1,31 @@
-import { Component } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { TerraformGeneratorService } from '../../services/terraform-generator.service';
 
 @Component({
   selector: 'app-terraform-preview',
-  imports: [],
+  standalone: true,
+  imports: [CommonModule],
   templateUrl: './terraform-preview.component.html',
-  styleUrl: './terraform-preview.component.css'
+  styleUrls: ['./terraform-preview.component.css']
 })
-export class TerraformPreviewComponent {
+export class TerraformPreviewComponent implements OnChanges {
+  /** JSON de entrada: { resources: [...] } */
+  @Input() configJson: any;
 
+  /** HCL gerado */
+  terraformCode = '';
+
+  constructor(private gen: TerraformGeneratorService) {}
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['configJson']) {
+      this.terraformCode = this.gen.generate(this.configJson || {});
+    }
+  }
 }
