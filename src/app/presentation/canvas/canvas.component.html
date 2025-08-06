@@ -1,18 +1,86 @@
-<div
-  #canvasRef
-  class="canvas"
-  cdkDropList
-  id="canvas-drop"
-  [cdkDropListConnectedTo]="['palette-drop']"
-  (cdkDropListDropped)="onDrop($event)"
->
+<div class="canvas-container">
+  <div class="controls">
+    <!-- Ícone PNG para DESENHAR tracejado -->
+    <button
+      class="icon-btn"
+      (click)="toggleDashedMode()"
+      [class.active]="drawMode && lineStyle === 'dashed'"
+    >
+      <img
+        src="canva/linha-tracejada.png"
+        alt="Tracejado"
+        class="icon-btn-img"
+      />
+    </button>
+
+    <!-- Ícone PNG para DESENHAR sólido -->
+    <button
+      class="icon-btn"
+      (click)="toggleSolidMode()"
+      [class.active]="drawMode && lineStyle === 'solid'"
+    >
+      <img
+        src="canva/linha-diagonal.png"
+        alt="Sólido"
+        class="icon-btn-img"
+      />
+    </button>
+
+    <!-- Ícone PNG para APAGAR linha -->
+    <button
+      class="icon-btn"
+      (click)="toggleDeleteMode()"
+      [class.active]="deleteMode"
+    >
+      <img
+        src="canva/borracha.png"
+        alt="Apagar"
+        class="icon-btn-img"
+      />
+    </button>
+  </div>
+
   <div
-    class="node"
-    *ngFor="let svc of droppedServices; let i = index"
-    [ngStyle]="{ left: svc.x + 'px', top: svc.y + 'px' }"
-    (mousedown)="startNodeDrag(i, $event)"
+    #canvasRef
+    class="canvas"
+    cdkDropList
+    id="canvas-drop"
+    [cdkDropListConnectedTo]="['palette-drop']"
+    (cdkDropListDropped)="onDrop($event)"
+    (click)="onCanvasClick($event)"
   >
-    <img [src]="svc.icon" class="node-icon" />
-    <div class="node-label">{{ svc.label }}</div>
+    <svg class="connections">
+      <ng-container *ngFor="let conn of connections; let i = index">
+        <!-- Hit-area para clique -->
+        <line
+          class="hit-area"
+          (click)="onLineClick(i)"
+          [attr.x1]="conn.x1"
+          [attr.y1]="conn.y1"
+          [attr.x2]="conn.x2"
+          [attr.y2]="conn.y2"
+        />
+        <!-- Linha visível: adiciona classe dashed ou solid -->
+        <line
+          class="visible-line"
+          [ngClass]="conn.style"
+          [attr.x1]="conn.x1"
+          [attr.y1]="conn.y1"
+          [attr.x2]="conn.x2"
+          [attr.y2]="conn.y2"
+        />
+      </ng-container>
+    </svg>
+
+    <div
+      class="node"
+      *ngFor="let svc of droppedServices; let i = index"
+      #nodeElem
+      [ngStyle]="{ left: svc.x + 'px', top: svc.y + 'px' }"
+      (mousedown)="startNodeDrag(i, $event)"
+    >
+      <img [src]="svc.icon" class="node-icon" />
+      <div class="node-label">{{ svc.label }}</div>
+    </div>
   </div>
 </div>
