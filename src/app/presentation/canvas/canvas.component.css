@@ -1,0 +1,39 @@
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.node {
+  position: absolute; /* essential for left/top */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: #262c3a;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+  cursor: grab;
+  user-select: none;
+  width: 100px;
+}
+
+.node:active {
+  cursor: grabbing;
+}
+
+.node-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.node-label {
+  font-size: 13px;
+}

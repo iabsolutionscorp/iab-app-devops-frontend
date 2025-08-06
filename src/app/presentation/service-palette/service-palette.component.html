@@ -1,0 +1,16 @@
+<div
+  class="palette"
+  cdkDropList
+  id="palette-drop"
+  [cdkDropListConnectedTo]="['canvas-drop']"
+>
+  <div
+    class="palette-item"
+    *ngFor="let service of services"
+    cdkDrag
+    [cdkDragData]="service"
+  >
+    <img [src]="service.icon" class="palette-icon" />
+    <div class="palette-label">{{ service.label }}</div>
+  </div>
+</div>

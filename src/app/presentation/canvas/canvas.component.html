@@ -1,0 +1,18 @@
+<div
+  #canvasRef
+  class="canvas"
+  cdkDropList
+  id="canvas-drop"
+  [cdkDropListConnectedTo]="['palette-drop']"
+  (cdkDropListDropped)="onDrop($event)"
+>
+  <div
+    class="node"
+    *ngFor="let svc of droppedServices; let i = index"
+    [ngStyle]="{ left: svc.x + 'px', top: svc.y + 'px' }"
+    (mousedown)="startNodeDrag(i, $event)"
+  >
+    <img [src]="svc.icon" class="node-icon" />
+    <div class="node-label">{{ svc.label }}</div>
+  </div>
+</div>
