@@ -3,14 +3,20 @@
   cdkDropList
   id="palette-drop"
   [cdkDropListConnectedTo]="['canvas-drop']"
+  [cdkDropListSortingDisabled]="true"
+  (cdkDropListDropped)="onPaletteDrop($event)"
 >
-  <div
-    class="palette-item"
-    *ngFor="let service of services"
-    cdkDrag
-    [cdkDragData]="service"
-  >
-    <img [src]="service.icon" class="palette-icon" />
-    <div class="palette-label">{{ service.label }}</div>
+  <div class="grid">
+    <div
+      class="palette-item"
+      *ngFor="let service of services"
+      cdkDrag
+      [cdkDragData]="service"
+    >
+      <div class="icon">
+        <img [src]="service.icon" [alt]="service.label" />
+      </div>
+      <div class="label">{{ service.label }}</div>
+    </div>
   </div>
 </div>

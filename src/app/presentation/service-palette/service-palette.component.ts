@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DragDropModule } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-service-palette',
@@ -11,8 +11,18 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 })
 export class ServicePaletteComponent {
   services = [
-    { label: 'EC2',    icon: 'icons/ec2.png'    },
-    { label: 'S3',     icon: 'icons/s3.png'     },
-    { label: 'Lambda', icon: 'icons/lambda.png' },
+    { label: 'EC2',    icon: '/icons/ec2.png'    },
+    { label: 'Dynamo', icon: '/icons/dynamo.png' },
+    { label: 'ECS',    icon: '/icons/ecs.png'    },
+    { label: 'VPC',    icon: '/icons/vpc.png'    },
+    { label: 'Glue',   icon: '/icons/glue.png'   },
   ];
+
+  onPaletteDrop(event: CdkDragDrop<any>) {
+    // Bloqueia qualquer reordenação dentro do próprio palette
+    if (event.previousContainer === event.container) {
+      return;
+    }
+    // Se quiser tratar drops vindos de outros containers, faça aqui
+  }
 }
