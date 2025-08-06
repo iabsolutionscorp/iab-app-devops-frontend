@@ -1,20 +1,34 @@
 <div class="topbar">
-  <!-- Lado esquerdo -->
   <div class="topbar-left">
     <span class="logo">IAB</span>
     <span class="divider"></span>
-    <span class="project-name">projeto - microfrontend_iab_solutions</span>
+
+    <!-- Modo leitura: mostra o nome e abre edição ao clicar -->
+    <ng-container *ngIf="!editingName">
+      <span
+        class="project-name"
+        (click)="startEditingName()"
+        title="Clique para editar"
+      >
+        {{ projectName }}
+      </span>
+    </ng-container>
+
+    <!-- Modo edição: input já focado e texto selecionado -->
+    <ng-container *ngIf="editingName">
+      <input
+        #projectNameInput
+        class="project-name-input"
+        [(ngModel)]="projectName"
+        (blur)="finishEditingName()"
+        (keydown.enter)="finishEditingName()"
+      />
+    </ng-container>
   </div>
 
-  <!-- Lado direito -->
   <div class="topbar-right">
-    <button class="template-btn">
-      🗂 Templates
-    </button>
-    <button
-      class="new-arch-btn"
-      (click)="onNewArchitectureClick()"
-    >
+    <button class="template-btn">🗂 Templates</button>
+    <button class="new-arch-btn" (click)="onNewArchitectureClick()">
       ➕ Nova arquitetura
     </button>
     <img

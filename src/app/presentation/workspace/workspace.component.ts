@@ -1,8 +1,8 @@
 import { Component, ViewChild } from '@angular/core';
+import { TopbarComponent } from '../topbar/topbar.component';
 import { ServicePaletteComponent } from '../service-palette/service-palette.component';
 import { CanvasComponent } from '../canvas/canvas.component';
 import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
-import { TopbarComponent } from '../topbar/topbar.component';
 
 @Component({
   selector: 'app-workspace',
@@ -17,11 +17,18 @@ import { TopbarComponent } from '../topbar/topbar.component';
   styleUrls: ['./workspace.component.css']
 })
 export class WorkspaceComponent {
-  /** Pega a instância do Canvas para poder resetar tudo */
+  /** Nome atual do projeto */
+  projectName = 'novo projeto';
+
   @ViewChild('canvas') canvas!: CanvasComponent;
 
-  /** Chamado quando o Topbar emite newArchitecture */
   onNewArchitecture() {
     this.canvas.clearAll();
+    // reseta também o nome do projeto
+    this.projectName = 'novo projeto';
+  }
+
+  onProjectNameChange(newName: string) {
+    this.projectName = newName;
   }
 }

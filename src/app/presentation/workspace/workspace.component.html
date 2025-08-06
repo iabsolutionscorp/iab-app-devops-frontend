@@ -1,11 +1,11 @@
 <div class="workspace">
-  <!-- Topbar com listener no evento newArchitecture -->
   <app-topbar
     class="topbar-wrapper"
+    [projectName]="projectName"
     (newArchitecture)="onNewArchitecture()"
+    (projectNameChange)="onProjectNameChange($event)"
   ></app-topbar>
 
-  <!-- Corpo principal -->
   <div class="body">
     <div class="sidebar">
       <app-service-palette></app-service-palette>
@@ -13,10 +13,8 @@
 
     <div class="main-content">
       <div class="canvas-wrapper">
-        <!-- canvas com template ref para o ViewChild -->
         <app-canvas #canvas></app-canvas>
       </div>
-
       <div class="terraform-wrapper">
         <app-terraform-preview></app-terraform-preview>
       </div>
