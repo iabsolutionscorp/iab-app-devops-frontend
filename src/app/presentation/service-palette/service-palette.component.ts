@@ -11,8 +11,8 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 })
 export class ServicePaletteComponent {
   services = [
-    { label: 'EC2',    icon: 'assets/icons/ec2.png'    },
-    { label: 'S3',     icon: 'assets/icons/s3.png'     },
-    { label: 'Lambda', icon: 'assets/icons/lambda.png' },
+    { label: 'EC2',    icon: 'icons/ec2.png'    },
+    { label: 'S3',     icon: 'icons/s3.png'     },
+    { label: 'Lambda', icon: 'icons/lambda.png' },
   ];
 }
