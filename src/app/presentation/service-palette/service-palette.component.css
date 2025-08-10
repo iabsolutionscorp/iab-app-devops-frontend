@@ -1,6 +1,8 @@
 /* ==== container principal ==== */
 :host {
   display: block;
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-weight: 700;
 }
 
 .palette {

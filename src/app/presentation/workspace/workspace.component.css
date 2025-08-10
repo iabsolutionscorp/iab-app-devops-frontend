@@ -72,3 +72,72 @@
   display: block;
 }
 
+/* Layout principal:  canvas | splitter | terraform  */
+.main-content {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: calc(100vh - 140px); /* ajuste se seu topo for outro tamanho */
+}
+
+/* Canvas ocupa o resto */
+.canvas-wrapper {
+  flex: 1 1 auto;
+  min-width: 420px; /* evita o canvas ficar impraticável quando encolhe */
+  overflow: hidden;
+}
+
+/* Splitter (barra arrastável) */
+.splitter {
+  width: 8px;
+  cursor: col-resize;
+  position: relative;
+}
+.splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent 0, #2b6fff33 50%, transparent 100%);
+  opacity: .0;
+  transition: opacity .15s ease;
+}
+.splitter:hover::before { opacity: .85; }
+
+/* Painel direito escuro */
+.terraform-wrapper {
+  width: 520px;            /* largura inicial maior */
+  min-width: 340px;
+  max-width: 70vw;
+  overflow: hidden;        /* remove scroll externo */
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid #20232b;
+}
+.terraform-wrapper.dark {
+  background: #0f1115;     /* preto elegante */
+}
+
+/* Título Poppins branco */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+.terraform-wrapper .title {
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  color: #ffffff;
+  padding: 12px 14px 6px;
+}
+
+/* O preview ocupa todo o restante, sem barras externas */
+.terraform-wrapper app-terraform-preview {
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+
+.sidebar {
+  flex: 0 0 380px;   /* tente 380–440px conforme seu gosto */
+  max-width: 280px;
+  min-width: 180px;
+}

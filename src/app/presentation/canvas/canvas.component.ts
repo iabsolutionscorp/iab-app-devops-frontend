@@ -9,6 +9,7 @@ import {
   OnDestroy,
   Output,
   EventEmitter,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
@@ -66,7 +67,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   private offsetY = 0;
   private subs = new Subscription();
 
-  constructor(private ngZone: NgZone) {}
+  constructor(private ngZone: NgZone, private cdr: ChangeDetectorRef) {}
   ngAfterViewInit(): void {}
   ngOnDestroy(): void { this.subs.unsubscribe(); }
 
@@ -184,20 +185,24 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   private onNodeMove(evt: MouseEvent) {
     if (this.draggingIndex === null) return;
-
+  
     this.ngZone.run(() => {
       const rect = this.canvasRef.nativeElement.getBoundingClientRect();
       let x = evt.clientX - rect.left - this.offsetX;
-      let y = evt.clientY - rect.top - this.offsetY;
+      let y = evt.clientY - rect.top  - this.offsetY;
       x = Math.max(0, Math.min(x, rect.width));
       y = Math.max(0, Math.min(y, rect.height));
-
+  
       this.droppedServices[this.draggingIndex!] = {
         ...this.droppedServices[this.draggingIndex!],
         x, y
       };
+  
+      // mantém as linhas coladas durante o drag
+      this.cdr.detectChanges();
     });
   }
+  
 
   private endNodeDrag() {
     this.draggingIndex = null;
@@ -208,21 +213,26 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   // ===== Portas =====
   getPortXY(ref: PortRef): { x: number; y: number } {
-    const nodeEl = this.nodeElems?.toArray()[ref.nodeIndex]?.nativeElement;
-    if (!nodeEl) return { x: 0, y: 0 };
-
-    const canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
-    const rect = nodeEl.getBoundingClientRect();
-    const midX = rect.left - canvasRect.left + rect.width / 2;
-    const midY = rect.top  - canvasRect.top  + rect.height / 2;
-
+    // usa o estado (left/top) + tamanho real do elemento
+    const el = this.nodeElems?.toArray()[ref.nodeIndex]?.nativeElement;
+    const node = this.droppedServices[ref.nodeIndex];
+    if (!el || !node) return { x: 0, y: 0 };
+  
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+  
+    // left/top já são relativos ao canvas, então é direto
+    const left = node.x;
+    const top  = node.y;
+  
     switch (ref.side) {
-      case 'top':    return { x: midX, y: rect.top    - canvasRect.top };
-      case 'right':  return { x: rect.right - canvasRect.left, y: midY };
-      case 'bottom': return { x: midX, y: rect.bottom - canvasRect.top };
-      case 'left':   return { x: rect.left  - canvasRect.left, y: midY };
+      case 'top':    return { x: left + w / 2, y: top };
+      case 'right':  return { x: left + w,     y: top + h / 2 };
+      case 'bottom': return { x: left + w / 2, y: top + h };
+      case 'left':   return { x: left,         y: top + h / 2 };
     }
   }
+  
 
   onPortDown(nodeIndex: number, side: PortSide, ev: MouseEvent) {
     ev.stopPropagation();

@@ -11,12 +11,16 @@
       <app-service-palette></app-service-palette>
     </div>
 
-    <div class="main-content">
+    <!-- MAIN: canvas | splitter | terraform -->
+    <div class="main-content" #mainContent>
       <div class="canvas-wrapper">
         <app-canvas #canvas (graphChange)="terraformJson = $event"></app-canvas>
       </div>
 
-      <div class="terraform-wrapper">
+      <!-- divisor arrastável -->
+      <div class="splitter" (mousedown)="startResize($event)"></div>
+
+      <div class="terraform-wrapper dark" #terraformPane>
         <div class="title">Terraform Configuration</div>
         <app-terraform-preview
           [configJson]="terraformJson"
