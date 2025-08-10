@@ -6,19 +6,16 @@ import {IacTypeEnum} from '../model/iac-type.enum';
 import {IacFileResponse} from '../model/iac-file-request.model';
 import {GenerateIacFileRequest} from '../model/generate-iac-file-request.model';
 
-export const IAC_API_BASE = new InjectionToken<string>('IAC_API_BASE');
-
 @Injectable({ providedIn: 'root' })
 export class IacService {
+  private apiUrl = "http://localhost:8080/v1";
   constructor(
-    private http: HttpClient,
-    @Optional() @Inject(IAC_API_BASE) private readonly baseUrl: string | null
+    private http: HttpClient
   ) {
-    this.baseUrl = this.baseUrl ?? '/v1/iac';
   }
 
   generateCode$(req: GenerateIacFileRequest): Observable<{ blob: Blob; filename: string | null }> {
-    return this.http.post(`${this.baseUrl}/generate`, req, {
+    return this.http.post(`${this.apiUrl}/generate`, req, {
       observe: 'response',
       responseType: 'blob',
     }).pipe(
@@ -30,7 +27,7 @@ export class IacService {
   }
 
   deploy$(id: number): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/${id}/deploy`, null);
+    return this.http.post<void>(`${this.apiUrl}/${id}/deploy`, null);
   }
 
   create$(fileName: string, type: IacTypeEnum, file: File): Observable<number> {
@@ -39,7 +36,7 @@ export class IacService {
     form.append('type', String(type));
     form.append('file', file, file.name);
 
-    return this.http.post(`${this.baseUrl}`, form, {
+    return this.http.post(`${this.apiUrl}`, form, {
       observe: 'response',
     }).pipe(
       map((res) => {
@@ -53,13 +50,13 @@ export class IacService {
   }
 
   getById$(id: number): Observable<IacFileResponse> {
-    return this.http.get<IacFileResponse>(`${this.baseUrl}/${id}`);
+    return this.http.get<IacFileResponse>(`${this.apiUrl}/${id}`);
   }
 
   update$(id: number, file: File): Observable<void> {
     const form = new FormData();
     form.append('file', file, file.name);
-    return this.http.put<void>(`${this.baseUrl}/${id}`, form);
+    return this.http.put<void>(`${this.apiUrl}/${id}`, form);
   }
 
   // --------- helpers ---------

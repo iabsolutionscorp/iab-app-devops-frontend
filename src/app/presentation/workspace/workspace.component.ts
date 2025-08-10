@@ -1,9 +1,18 @@
+// src/app/presentation/workspace/workspace.component.ts
 import { Component, ViewChild } from '@angular/core';
+import { CommonModule } from '@angular/common';
+
 import { TopbarComponent } from '../topbar/topbar.component';
 import { ServicePaletteComponent } from '../service-palette/service-palette.component';
 import { CanvasComponent } from '../canvas/canvas.component';
 import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
 import { IaPromptComponent } from '../ia-prompt/ia-prompt';
+import {IacService} from '../../infra/services/iac-file.service';
+import {GenerateIacFileRequest} from '../../infra/model/generate-iac-file-request.model';
+import {IacTypeEnum} from '../../infra/model/iac-type.enum';
+
+// >>> SERVICE E MODELOS (conforme você enviou)
+
 
 @Component({
   selector: 'app-workspace',
@@ -11,6 +20,7 @@ import { IaPromptComponent } from '../ia-prompt/ia-prompt';
   templateUrl: './workspace.component.html',
   styleUrls: ['./workspace.component.css'],
   imports: [
+    CommonModule,                // resolve *ngIf e afins no template
     TopbarComponent,
     ServicePaletteComponent,
     CanvasComponent,
@@ -29,6 +39,8 @@ export class WorkspaceComponent {
   promptResponse: string | null = null;
   promptError: string | null = null;
 
+  constructor(private iac: IacService) {}
+
   onNewArchitecture() {
     this.canvas.clearAll();
     this.projectName = 'novo projeto';
@@ -42,16 +54,46 @@ export class WorkspaceComponent {
     this.promptOpen = !this.promptOpen;
   }
 
+  // === AGORA CONECTADO AO ENDPOINT /v1/generate via IacService.generateCode$ ===
   onPromptSubmit(text: string) {
-    // Por enquanto só demonstra: mostra "enviando", simula retorno e mantém no front
+    this.promptOpen = true;
     this.promptLoading = true;
     this.promptError = null;
     this.promptResponse = null;
 
-    // aqui você pode trocar pelo serviço real de IA
-    setTimeout(() => {
-      this.promptLoading = false;
-      this.promptResponse = `Prompt recebido: ${text}\n(Conecte ao seu endpoint de IA para retornar algo útil aqui.)`;
-    }, 600);
+    // Monte o payload conforme seu modelo
+    const req: GenerateIacFileRequest = {
+      description: text,            // se no seu modelo o campo é "prompt", troque aqui
+      type: IacTypeEnum.TERRAFORM,  // ajuste o tipo se necessário
+    } as any;
+
+    this.iac.generateCode$(req).subscribe({
+      next: ({ blob, filename }) => {
+        // tenta exibir como texto; se não der, mostra aviso com nome do arquivo
+        blob.text()
+          .then((txt) => {
+            this.promptLoading = false;
+            // se vier JSON, formata bonitinho; se não, exibe como veio
+            try {
+              const parsed = JSON.parse(txt);
+              this.promptResponse = JSON.stringify(parsed, null, 2);
+            } catch {
+              this.promptResponse = txt;
+            }
+          })
+          .catch(() => {
+            this.promptLoading = false;
+            this.promptResponse = `Arquivo gerado${filename ? `: ${filename}` : ''}. (Conteúdo binário — não exibível aqui)`;
+          });
+      },
+      error: (err) => {
+        this.promptLoading = false;
+        this.promptError =
+          err?.error?.message ??
+          err?.message ??
+          'Erro ao gerar IAC.';
+        console.error('generateCode$ error:', err);
+      }
+    });
   }
 }
