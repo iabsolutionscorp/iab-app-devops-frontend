@@ -181,3 +181,9 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Mostra todas as ports enquanto está conectando */
+.canvas.show-ports .port {
+  opacity: 1;
+  pointer-events: auto;
+}

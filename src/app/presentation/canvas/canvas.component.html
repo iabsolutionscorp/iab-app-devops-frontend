@@ -2,7 +2,8 @@
   <div class="controls">
     <button
       class="icon-btn"
-      (click)="toggleDashedMode()"
+      (click)="toggleDashedMode()
+      "
       [class.active]="drawMode && lineStyle === 'dashed'"
       title="Desenhar tracejado"
     >
@@ -41,6 +42,7 @@
     #canvasRef
     class="canvas"
     [class.service-delete-mode]="serviceDeleteMode"
+    [class.show-ports]="!!portDraft.from"
     cdkDropList
     id="canvas-drop"
     [cdkDropListConnectedTo]="['palette-drop']"

@@ -427,8 +427,16 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     return { variables, providers, data: dataBlocks, resources };
   }  
   /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
+  /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
   public loadFromConfig(config: any) {
-    // limpa
+    // 1) Salva os ícones atuais por tipo (pra não perder ao recarregar)
+    const iconByType = new Map<string, string>();
+    for (const n of this.droppedServices) {
+      const t = this.normalizeType(n.label);
+      if (n.icon && !iconByType.has(t)) iconByType.set(t, n.icon);
+    }
+
+    // 2) Limpa estado
     this.droppedServices = [];
     this.connections = [];
     this.portConnections = [];
@@ -444,7 +452,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     const dynamoRes = resources.filter((r: any) => r.type === 'aws_dynamodb_table');
     const dynIndexByName = new Map<string, number>();
 
-    // cria 1 nó Glue se houver qualquer coisa de Glue
+    // cria 1 nó Glue se houver algo de Glue
     const hasGlue =
       resources.some((r: any) => r.type === 'aws_glue_crawler') ||
       resources.some((r: any) => r.type === 'aws_glue_catalog_database') ||
@@ -452,18 +460,28 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
     let glueIndex: number | null = null;
     if (hasGlue) {
-      this.droppedServices.push({ label: 'Glue', icon: '', x: 200, y: 200 });
+      this.droppedServices.push({
+        label: 'Glue',
+        icon: iconByType.get('glue') ?? this.defaultIconFor('glue'),
+        x: 200,
+        y: 200
+      });
       glueIndex = 0;
     }
 
-    // posicionar os Dynamo à direita do Glue
+    // posiciona os Dynamo à direita do Glue
     const startX = hasGlue ? 460 : 200;
     let dx = startX;
     const y = 200;
 
-    dynamoRes.forEach((r: any, i: number) => {
+    dynamoRes.forEach((r: any) => {
       const nodeLabel = 'Dynamo';
-      this.droppedServices.push({ label: nodeLabel, icon: '', x: dx, y });
+      this.droppedServices.push({
+        label: nodeLabel,
+        icon: iconByType.get('dynamodb') ?? this.defaultIconFor('dynamodb'),
+        x: dx,
+        y
+      });
       const idx = this.droppedServices.length - 1;
       dynIndexByName.set(r.name, idx);
       dx += 220;
@@ -475,7 +493,6 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       const dynBlock = (c.blocks || []).find((b: any) => b.name === 'dynamodb_target');
       const path: string | undefined = dynBlock?.body?.path;
       if (!path) continue;
-      // espera: "${aws_dynamodb_table.dynamo_X.name}" -> extrai o identificador
       const m = /\${aws_dynamodb_table\.([A-Za-z0-9_\-]+)\.name}/.exec(path);
       if (!m) continue;
       const dynName = m[1];
@@ -489,7 +506,17 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // notifica quem escuta
     this.emitGraph();
+  }
+  /** Fallback de ícone por tipo – ajuste os paths se forem diferentes no seu projeto. */
+  private defaultIconFor(type: string): string {
+    const map: Record<string, string> = {
+      dynamodb: 'assets/icons/aws/dynamodb.png',
+      glue:     'assets/icons/aws/glue.png',
+      ecs:      'assets/icons/aws/ecs.png',
+      ec2:      'assets/icons/aws/ec2.png',
+      vpc:      'assets/icons/aws/vpc.png',
+    };
+    return map[type] ?? '';
   }
 }
