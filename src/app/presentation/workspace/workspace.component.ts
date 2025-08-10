@@ -18,10 +18,8 @@ import { TerraformPreviewComponent } from '../terraform-preview/terraform-previe
 })
 export class WorkspaceComponent {
   projectName = 'novo projeto';
-
   @ViewChild('canvas') canvas!: CanvasComponent;
 
-  // JSON que vai para o TerraformPreview
   terraformJson: any = {};
 
   onNewArchitecture() {
@@ -32,5 +30,12 @@ export class WorkspaceComponent {
 
   onProjectNameChange(newName: string) {
     this.projectName = newName;
+  }
+
+  // quando o usuário importa Terraform
+  onImportConfig(config: any) {
+    this.terraformJson = config || {};
+    // carrega no canvas também (reconstrução visual)
+    this.canvas.loadFromConfig(this.terraformJson);
   }
 }

@@ -391,4 +391,70 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
     return { variables, data: dataBlocks, resources };
   }
+  /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
+  public loadFromConfig(config: any) {
+    // limpa
+    this.droppedServices = [];
+    this.connections = [];
+    this.portConnections = [];
+    this.drawMode = false;
+    this.deleteMode = false;
+    this.serviceDeleteMode = false;
+    this.lineStyle = null;
+    this.portDraft = { from: null };
+
+    const resources = Array.isArray(config?.resources) ? config.resources : [];
+
+    // DynamoDB -> nós
+    const dynamoRes = resources.filter((r: any) => r.type === 'aws_dynamodb_table');
+    const dynIndexByName = new Map<string, number>();
+
+    // cria 1 nó Glue se houver qualquer coisa de Glue
+    const hasGlue =
+      resources.some((r: any) => r.type === 'aws_glue_crawler') ||
+      resources.some((r: any) => r.type === 'aws_glue_catalog_database') ||
+      resources.some((r: any) => r.type === 'aws_iam_role');
+
+    let glueIndex: number | null = null;
+    if (hasGlue) {
+      this.droppedServices.push({ label: 'Glue', icon: '', x: 200, y: 200 });
+      glueIndex = 0;
+    }
+
+    // posicionar os Dynamo à direita do Glue
+    const startX = hasGlue ? 460 : 200;
+    let dx = startX;
+    const y = 200;
+
+    dynamoRes.forEach((r: any, i: number) => {
+      const nodeLabel = 'Dynamo';
+      this.droppedServices.push({ label: nodeLabel, icon: '', x: dx, y });
+      const idx = this.droppedServices.length - 1;
+      dynIndexByName.set(r.name, idx);
+      dx += 220;
+    });
+
+    // Conexões: cada glue crawler com dynamodb_target -> link
+    const crawlers = resources.filter((r: any) => r.type === 'aws_glue_crawler');
+    for (const c of crawlers) {
+      const dynBlock = (c.blocks || []).find((b: any) => b.name === 'dynamodb_target');
+      const path: string | undefined = dynBlock?.body?.path;
+      if (!path) continue;
+      // espera: "${aws_dynamodb_table.dynamo_X.name}" -> extrai o identificador
+      const m = /\${aws_dynamodb_table\.([A-Za-z0-9_\-]+)\.name}/.exec(path);
+      if (!m) continue;
+      const dynName = m[1];
+      const dynIdx = dynIndexByName.get(dynName);
+      if (glueIndex !== null && dynIdx !== undefined) {
+        this.portConnections.push({
+          source: { nodeIndex: glueIndex, side: 'right' },
+          target: { nodeIndex: dynIdx, side: 'left' },
+          style: 'solid'
+        });
+      }
+    }
+
+    // notifica quem escuta
+    this.emitGraph();
+  }
 }

@@ -13,14 +13,14 @@
 
     <div class="main-content">
       <div class="canvas-wrapper">
-        <app-canvas
-          #canvas
-          (graphChange)="terraformJson = $event"
-        ></app-canvas>
+        <app-canvas #canvas (graphChange)="terraformJson = $event"></app-canvas>
       </div>
+
       <div class="terraform-wrapper">
+        <div class="title">Terraform Configuration</div>
         <app-terraform-preview
           [configJson]="terraformJson"
+          (importConfig)="onImportConfig($event)"
         ></app-terraform-preview>
       </div>
     </div>
