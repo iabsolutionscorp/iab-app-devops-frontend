@@ -12,9 +12,33 @@
     </div>
 
     <div class="main-content">
+      <!-- Canvas -->
       <div class="canvas-wrapper">
         <app-canvas #canvas></app-canvas>
+
+        <!-- ===== Gaveta do prompt colada no lado ESQUERDO do grid ===== -->
+        <div class="prompt-float" [class.open]="promptOpen">
+          <button class="prompt-toggle"
+                  (click)="togglePrompt()"
+                  [attr.aria-expanded]="promptOpen"
+                  aria-label="Abrir/fechar prompt de IA">
+            <span *ngIf="!promptOpen">▶</span>
+            <span *ngIf="promptOpen">◀</span>
+          </button>
+
+          <div class="prompt-card" (click)="$event.stopPropagation()">
+            <app-ia-prompt
+              [loading]="promptLoading"
+              [response]="promptResponse"
+              [error]="promptError"
+              (promptSubmit)="onPromptSubmit($event)"
+            ></app-ia-prompt>
+          </div>
+        </div>
+        <!-- ===== FIM da gaveta ===== -->
       </div>
+
+      <!-- Preview à direita -->
       <div class="terraform-wrapper">
         <app-terraform-preview></app-terraform-preview>
       </div>

@@ -1,0 +1,25 @@
+<div class="ia-prompt">
+  <h3>Prompt de IA</h3>
+
+  <textarea
+    [(ngModel)]="prompt"
+    placeholder="Descreva aqui o que você quer gerar..."
+    (keydown.enter)="onSend()"
+  ></textarea>
+
+  <div class="actions">
+    <button (click)="onSend()" [disabled]="loading || !prompt.trim()">
+      {{ loading ? 'Enviando...' : 'Enviar' }}
+    </button>
+    <button class="ghost" (click)="onClear()" [disabled]="loading && !response">
+      Limpar
+    </button>
+  </div>
+
+  <div class="response" *ngIf="response">
+    <div class="response-title">Resposta</div>
+    <pre>{{ response }}</pre>
+  </div>
+
+  <div class="error" *ngIf="error">{{ error }}</div>
+</div>
