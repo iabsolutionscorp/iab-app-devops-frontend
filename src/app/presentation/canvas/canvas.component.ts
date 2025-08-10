@@ -30,6 +30,20 @@ interface Connection {
   style: 'dashed' | 'solid';
 }
 
+/** ===== Novos tipos para portas ===== */
+type PortSide = 'top' | 'right' | 'bottom' | 'left';
+
+interface PortRef {
+  nodeIndex: number;
+  side: PortSide;
+}
+
+interface PortConnection {
+  source: PortRef;
+  target: PortRef;
+  style: 'dashed' | 'solid';
+}
+
 @Component({
   selector: 'app-canvas',
   standalone: true,
@@ -47,10 +61,14 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   // Nós soltos no canvas
   droppedServices: ServiceNode[] = [];
 
-  // Conexões desenhadas
+  // Conexões desenhadas (modo antigo por clique no canvas)
   connections: Connection[] = [];
 
-  // Modos mutuamente exclusivos
+  // ===== Novas conexões porta-a-porta =====
+  portConnections: PortConnection[] = [];
+  portDraft: { from: PortRef | null; toXY?: { x: number; y: number } } = { from: null };
+
+  // Modos
   drawMode = false;
   deleteMode = false;          // apaga linhas
   serviceDeleteMode = false;   // apaga serviços
@@ -65,8 +83,11 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   constructor(private ngZone: NgZone) {}
 
-  ngAfterViewInit() {}
-  ngOnDestroy() { this.subs.unsubscribe(); }
+  ngAfterViewInit(): void {}
+
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
+  }
 
   /** Ativa/desativa modo TRACEJADO */
   toggleDashedMode() {
@@ -101,6 +122,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       this.drawMode = false;
       this.serviceDeleteMode = false;
       this.lineStyle = null;
+      this.drawStartPoint = null;
     }
   }
 
@@ -115,8 +137,11 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  /** Clique no canvas para desenhar linha */
+  /** Clique no canvas (modo antigo de linhas) */
   onCanvasClick(evt: MouseEvent) {
+    // se estiver conectando portas, ignora cliques no canvas
+    if (this.portDraft.from) return;
+
     if (!this.drawMode || !this.lineStyle) return;
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = evt.clientX - rect.left;
@@ -142,15 +167,19 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.connections.splice(idx, 1);
   }
 
-  /** Solta serviço do palette no canvas */
+  /** Solta serviço do palette no canvas (mantido igual) */
   onDrop(event: CdkDragDrop<any>) {
-    if (event.previousContainer === event.container) return;
+    if ((event as any).previousContainer === (event as any).container) return;
     const mouseEvt = (event as any).event as MouseEvent;
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = mouseEvt.clientX - rect.left;
     const y = mouseEvt.clientY - rect.top;
-    const data = event.item.data as ServiceNode;
-    this.droppedServices.push({ ...data, x, y });
+    const data = (event.item.data || {}) as Partial<ServiceNode>;
+    this.droppedServices.push({
+      label: data.label ?? (data as any).type ?? 'SERVICE',
+      icon: data.icon ?? '',
+      x, y
+    });
   }
 
   /** Clique sobre um nó para apagar (em serviceDeleteMode) */
@@ -158,17 +187,30 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     if (!this.serviceDeleteMode) return;
     evt.stopPropagation();
     this.droppedServices.splice(idx, 1);
+    // também remove conexões de/para esse nó e ajusta índices
+    this.portConnections = this.portConnections
+      .filter(pc => pc.source.nodeIndex !== idx && pc.target.nodeIndex !== idx)
+      .map(pc => ({
+        ...pc,
+        source: {
+          nodeIndex: pc.source.nodeIndex > idx ? pc.source.nodeIndex - 1 : pc.source.nodeIndex,
+          side: pc.source.side
+        },
+        target: {
+          nodeIndex: pc.target.nodeIndex > idx ? pc.target.nodeIndex - 1 : pc.target.nodeIndex,
+          side: pc.target.side
+        }
+      }));
   }
 
-  /** Inicia drag manual de um nó */
+  /** Inicia drag manual de um nó (mantido) */
   startNodeDrag(i: number, evt: MouseEvent) {
-    if (this.serviceDeleteMode) return;  // impede drag no modo excluir serviço
+    if (this.serviceDeleteMode) return;  // impede drag no modo excluir
+    if ((evt.target as HTMLElement).classList.contains('port')) return; // não começa drag se clicou na porta
 
     evt.preventDefault();
     this.draggingIndex = i;
-    const nodeRect = (evt.target as HTMLElement)
-      .closest('.node')!
-      .getBoundingClientRect();
+    const nodeRect = (evt.target as HTMLElement).closest('.node')!.getBoundingClientRect();
     this.offsetX = evt.clientX - nodeRect.left;
     this.offsetY = evt.clientY - nodeRect.top;
 
@@ -202,6 +244,66 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.subs = new Subscription();
   }
 
+  // ====== Portas: cálculo de posição e interação ======
+
+  /** Coordenadas absolutas da porta no canvas */
+  getPortXY(ref: PortRef): { x: number; y: number } {
+    const nodeEl = this.nodeElems?.toArray()[ref.nodeIndex]?.nativeElement;
+    if (!nodeEl) return { x: 0, y: 0 };
+    const canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
+    const rect = nodeEl.getBoundingClientRect();
+    const midX = rect.left - canvasRect.left + rect.width / 2;
+    const midY = rect.top - canvasRect.top + rect.height / 2;
+    switch (ref.side) {
+      case 'top':    return { x: midX, y: rect.top - canvasRect.top };
+      case 'right':  return { x: rect.right - canvasRect.left, y: midY };
+      case 'bottom': return { x: midX, y: rect.bottom - canvasRect.top };
+      case 'left':   return { x: rect.left - canvasRect.left, y: midY };
+    }
+  }
+
+  onPortDown(nodeIndex: number, side: PortSide, ev: MouseEvent) {
+    ev.stopPropagation();
+    this.portDraft = { from: { nodeIndex, side } };
+  }
+
+  onPortUp(nodeIndex: number, side: PortSide, ev: MouseEvent) {
+    ev.stopPropagation();
+    const from = this.portDraft.from;
+    if (!from) return;
+
+    const target: PortRef = { nodeIndex, side };
+    if (from.nodeIndex === target.nodeIndex && from.side === target.side) {
+      this.portDraft = { from: null };
+      return;
+    }
+
+    const style: 'dashed' | 'solid' = (this.lineStyle ?? 'solid');
+    this.portConnections = [
+      ...this.portConnections,
+      { source: from, target, style }
+    ];
+    this.portDraft = { from: null };
+  }
+
+  onCanvasMouseMove(ev: MouseEvent) {
+    if (!this.portDraft.from) return;
+    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+    this.portDraft = {
+      ...this.portDraft,
+      toXY: { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
+    };
+  }
+
+  onCanvasMouseLeave() {
+    this.portDraft = { from: null };
+  }
+
+  onPortLineClick(index: number) {
+    if (!this.deleteMode) return;
+    this.portConnections = this.portConnections.filter((_, i) => i !== index);
+  }
+
   /**
    * Limpa tudo: serviços, conexões e modos.
    * Chame este método quando o Topbar emitir `newArchitecture`.
@@ -209,10 +311,12 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   public clearAll() {
     this.droppedServices = [];
     this.connections = [];
+    this.portConnections = [];
     this.drawMode = false;
     this.deleteMode = false;
     this.serviceDeleteMode = false;
     this.lineStyle = null;
     this.drawStartPoint = null;
+    this.portDraft = { from: null };
   }
 }
