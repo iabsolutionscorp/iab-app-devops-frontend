@@ -5,7 +5,7 @@ import {
   SimpleChanges
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TerraformGeneratorService } from '../../services/terraform-generator.service';
+import { TerraformGeneratorService } from '../../infra/services/terraform-generator.service';
 
 @Component({
   selector: 'app-terraform-preview',

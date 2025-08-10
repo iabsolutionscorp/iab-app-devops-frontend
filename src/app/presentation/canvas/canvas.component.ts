@@ -52,8 +52,8 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
 
   // Modos mutuamente exclusivos
   drawMode = false;
-  deleteMode = false;          // apaga linhas
-  serviceDeleteMode = false;   // apaga serviços
+  deleteMode = false;
+  serviceDeleteMode = false;
   lineStyle: 'dashed' | 'solid' | null = null;
   private drawStartPoint: { x: number; y: number } | null = null;
 
