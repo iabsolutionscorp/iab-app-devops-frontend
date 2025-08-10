@@ -32,10 +32,9 @@ export class WorkspaceComponent {
     this.projectName = newName;
   }
 
-  // quando o usuário importa Terraform
-  onImportConfig(config: any) {
+  /** Recebe JSON vindo da digitação no painel (tempo real) e aplica no Canvas */
+  onLiveConfig(config: any) {
     this.terraformJson = config || {};
-    // carrega no canvas também (reconstrução visual)
     this.canvas.loadFromConfig(this.terraformJson);
   }
 }

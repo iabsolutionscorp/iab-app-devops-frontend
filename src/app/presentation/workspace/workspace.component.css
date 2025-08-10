@@ -46,13 +46,29 @@
   box-sizing: border-box;
 }
 
+/* Painel da direita “Terraform Configuration” */
 .terraform-wrapper {
-  width: 300px;
-  background-color: #fff8f0;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem;
-  font-family: monospace;
-  overflow: auto;
-  box-sizing: border-box;
+  background: #fff7ee;
+  border: 1px solid #efe6dc;
+  border-radius: 12px;
+  padding: 12px;
+  height: calc(100vh - 140px); /* ocupa quase toda a viewport, ajuste se quiser */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;           /* evita barra extra na coluna */
 }
+
+.terraform-wrapper .title {
+  font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1b1b1b;
+  margin: 4px 4px 10px;
+}
+
+.terraform-wrapper app-terraform-preview {
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+

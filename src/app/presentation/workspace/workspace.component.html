@@ -20,7 +20,7 @@
         <div class="title">Terraform Configuration</div>
         <app-terraform-preview
           [configJson]="terraformJson"
-          (importConfig)="onImportConfig($event)"
+          (liveConfig)="onLiveConfig($event)"
         ></app-terraform-preview>
       </div>
     </div>

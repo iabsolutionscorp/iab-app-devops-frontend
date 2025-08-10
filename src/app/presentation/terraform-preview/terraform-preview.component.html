@@ -1,19 +1,11 @@
-<!-- Título e botões ficam no container do Workspace; aqui só o conteúdo do painel -->
 <div class="terraform-preview">
-  <!-- Modo importação -->
-  <div *ngIf="editMode" class="import-area">
-    <textarea [(ngModel)]="hclInput" class="codearea" rows="18" placeholder="Cole aqui seu Terraform HCL..."></textarea>
-    <div class="import-actions">
-      <button class="btn" (click)="applyImport()">Construir a partir do Terraform</button>
-      <button class="btn secondary" (click)="toggleImport()">Cancelar</button>
-    </div>
-  </div>
+  <textarea
+    class="codearea"
+    [(ngModel)]="hclText"
+    (ngModelChange)="onEditorChange($event)"
+    spellcheck="false"
+    placeholder="# Digite/cole Terraform HCL aqui. As alterações aplicam no canvas em ~600ms."
+  ></textarea>
 
-  <!-- Modo visualização -->
-  <div *ngIf="!editMode" class="view-area">
-    <pre class="code">{{ hcl || '# Arraste serviços e conecte portas para gerar o Terraform aqui.' }}</pre>
-    <div class="import-link">
-      <button class="btn tiny" (click)="toggleImport()">Importar Terraform</button>
-    </div>
-  </div>
+  <div *ngIf="parseError" class="error-tip">{{ parseError }}</div>
 </div>

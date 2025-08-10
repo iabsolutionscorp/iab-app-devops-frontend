@@ -1,24 +1,34 @@
-.tf-preview {
+.terraform-preview {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
-.tf-preview h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-  color: #333;
-}
-
-.tf-textarea {
+.codearea {
   flex: 1;
+  min-height: 0;
   width: 100%;
-  resize: none;
-  font-family: monospace;
-  font-size: 0.85rem;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  background: #1e1e1e;      /* fundo preto */
+  color: #dcdcdc;           /* texto claro */
+  font: 13px/1.45 "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  white-space: pre;
+  overflow: auto;           /* scroll dentro do editor, não na coluna inteira */
+  resize: none;             /* sem “cantinho” de redimensionar */
+  outline: none;
+  tab-size: 2;
+}
+
+.codearea:focus {
+  border-color: #3c7cff;
+  box-shadow: 0 0 0 3px rgba(60, 124, 255, 0.18);
+}
+
+.error-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ff7a7a;
 }

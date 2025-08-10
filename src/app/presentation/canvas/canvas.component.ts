@@ -300,17 +300,50 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       type: this.normalizeType(n.label),
       label: n.label
     }));
-
+  
     const edges = this.portConnections.map(pc => ({
       source: `node_${pc.source.nodeIndex}`,
       target: `node_${pc.target.nodeIndex}`
     }));
-
+  
     const resources: any[] = [];
     const dataBlocks: any[] = [];
     const variables: any[] = [];
-
-    // DynamoDB: uma tabela por nó
+    const providers: any[] = [];
+  
+    // -------------------------
+    // LocalStack provider + var
+    // -------------------------
+    variables.push({
+      name: 'localstack_endpoint',
+      type: 'string',
+      default: 'http://localhost:4566',
+      description: 'Endpoint do LocalStack'
+    });
+  
+    providers.push({
+      name: 'aws',
+      properties: {
+        access_key: 'test',
+        secret_key: 'test',
+        region: 'us-east-1',
+        s3_force_path_style: true,
+        skip_credentials_validation: true,
+        skip_metadata_api_check: true,
+        skip_requesting_account_id: true,
+        endpoints: {
+          s3: '${var.localstack_endpoint}',
+          dynamodb: '${var.localstack_endpoint}',
+          glue: '${var.localstack_endpoint}',
+          iam: '${var.localstack_endpoint}',
+          sts: '${var.localstack_endpoint}',
+        }
+      }
+    });
+  
+    // -------------------------
+    // DynamoDB tables
+    // -------------------------
     const dynamoNodes = nodes.filter(n => n.type === 'dynamodb');
     dynamoNodes.forEach((n, i) => {
       const name = `dynamo_${i + 1}`;
@@ -325,8 +358,10 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         blocks: [{ name: 'attribute', body: { name: 'id', type: 'S' } }]
       });
     });
-
-    // Glue base (se houver Glue no grafo)
+  
+    // -------------------------
+    // Glue base (se houver Glue)
+    // -------------------------
     const hasGlue = nodes.some(n => n.type === 'glue');
     if (hasGlue) {
       dataBlocks.push({
@@ -343,7 +378,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
           }
         ]
       });
-
+  
       resources.push({
         type: 'aws_iam_role',
         name: 'glue_role',
@@ -352,28 +387,28 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
           assume_role_policy: '${data.aws_iam_policy_document.glue_assume.json}'
         }
       });
-
+  
       resources.push({
         type: 'aws_glue_catalog_database',
         name: 'db',
         properties: { name: 'iac_db' }
       });
     }
-
-    // Ligações Glue <-> Dynamo viram crawlers
+  
+    // -------------------------
+    // Crawler para cada Glue <-> Dynamo
+    // -------------------------
     edges.forEach((e, idx) => {
       const s = nodes.find(n => n.id === e.source);
       const t = nodes.find(n => n.id === e.target);
       if (!s || !t) return;
-
+  
       const pair = [s, t];
       const glue   = pair.find(n => n.type === 'glue');
       const dynamo = pair.find(n => n.type === 'dynamodb');
-
       if (glue && dynamo) {
         const dynIndex = dynamoNodes.findIndex(d => d.id === dynamo.id);
         const dynRes = `dynamo_${dynIndex + 1}`;
-
         resources.push({
           type: 'aws_glue_crawler',
           name: `glue_to_${dynRes}_${idx + 1}`,
@@ -388,9 +423,9 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         });
       }
     });
-
-    return { variables, data: dataBlocks, resources };
-  }
+  
+    return { variables, providers, data: dataBlocks, resources };
+  }  
   /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
   public loadFromConfig(config: any) {
     // limpa
