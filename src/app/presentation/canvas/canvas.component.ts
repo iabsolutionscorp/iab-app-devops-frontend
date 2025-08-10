@@ -6,13 +6,12 @@ import {
   QueryList,
   NgZone,
   AfterViewInit,
-  OnDestroy
+  OnDestroy,
+  Output,
+  EventEmitter,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  CdkDragDrop,
-  DragDropModule
-} from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { fromEvent, Subscription } from 'rxjs';
 
 interface ServiceNode {
@@ -30,19 +29,9 @@ interface Connection {
   style: 'dashed' | 'solid';
 }
 
-/** ===== Novos tipos para portas ===== */
 type PortSide = 'top' | 'right' | 'bottom' | 'left';
-
-interface PortRef {
-  nodeIndex: number;
-  side: PortSide;
-}
-
-interface PortConnection {
-  source: PortRef;
-  target: PortRef;
-  style: 'dashed' | 'solid';
-}
+interface PortRef { nodeIndex: number; side: PortSide; }
+interface PortConnection { source: PortRef; target: PortRef; style: 'dashed' | 'solid'; }
 
 @Component({
   selector: 'app-canvas',
@@ -52,70 +41,50 @@ interface PortConnection {
   styleUrls: ['./canvas.component.css'],
 })
 export class CanvasComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('canvasRef', { static: true })
-  canvasRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('canvasRef', { static: true }) canvasRef!: ElementRef<HTMLDivElement>;
+  @ViewChildren('nodeElem', { read: ElementRef }) nodeElems!: QueryList<ElementRef<HTMLDivElement>>;
 
-  @ViewChildren('nodeElem', { read: ElementRef })
-  nodeElems!: QueryList<ElementRef<HTMLDivElement>>;
+  /** Emite o JSON do grafo para o Workspace -> TerraformPreview */
+  @Output() graphChange = new EventEmitter<any>();
 
-  // Nós soltos no canvas
+  // Estado
   droppedServices: ServiceNode[] = [];
-
-  // Conexões desenhadas (modo antigo por clique no canvas)
-  connections: Connection[] = [];
-
-  // ===== Novas conexões porta-a-porta =====
+  connections: Connection[] = []; // linhas “antigas” (click-to-click) — mantidas
   portConnections: PortConnection[] = [];
   portDraft: { from: PortRef | null; toXY?: { x: number; y: number } } = { from: null };
 
-  // Modos
+  // Modos UI (iguais aos seus botões)
   drawMode = false;
-  deleteMode = false;          // apaga linhas
-  serviceDeleteMode = false;   // apaga serviços
+  deleteMode = false;
+  serviceDeleteMode = false;
   lineStyle: 'dashed' | 'solid' | null = null;
   private drawStartPoint: { x: number; y: number } | null = null;
 
-  // Drag interno de nós
+  // Drag interno do nó
   private draggingIndex: number | null = null;
   private offsetX = 0;
   private offsetY = 0;
   private subs = new Subscription();
 
   constructor(private ngZone: NgZone) {}
-
   ngAfterViewInit(): void {}
+  ngOnDestroy(): void { this.subs.unsubscribe(); }
 
-  ngOnDestroy(): void {
-    this.subs.unsubscribe();
-  }
-
-  /** Ativa/desativa modo TRACEJADO */
+  // ===== Botões de modo =====
   toggleDashedMode() {
     this.drawMode = !(this.drawMode && this.lineStyle === 'dashed');
-    if (this.drawMode) {
-      this.deleteMode = false;
-      this.serviceDeleteMode = false;
-      this.lineStyle = 'dashed';
-    } else {
-      this.lineStyle = null;
-    }
+    if (this.drawMode) { this.deleteMode = false; this.serviceDeleteMode = false; this.lineStyle = 'dashed'; }
+    else { this.lineStyle = null; }
     this.drawStartPoint = null;
   }
 
-  /** Ativa/desativa modo SÓLIDO */
   toggleSolidMode() {
     this.drawMode = !(this.drawMode && this.lineStyle === 'solid');
-    if (this.drawMode) {
-      this.deleteMode = false;
-      this.serviceDeleteMode = false;
-      this.lineStyle = 'solid';
-    } else {
-      this.lineStyle = null;
-    }
+    if (this.drawMode) { this.deleteMode = false; this.serviceDeleteMode = false; this.lineStyle = 'solid'; }
+    else { this.lineStyle = null; }
     this.drawStartPoint = null;
   }
 
-  /** Ativa/desativa modo APAGAR LINHAS */
   toggleDeleteMode() {
     this.deleteMode = !this.deleteMode;
     if (this.deleteMode) {
@@ -126,7 +95,6 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  /** Ativa/desativa modo APAGAR SERVIÇOS */
   toggleServiceDeleteMode() {
     this.serviceDeleteMode = !this.serviceDeleteMode;
     if (this.serviceDeleteMode) {
@@ -137,12 +105,11 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  /** Clique no canvas (modo antigo de linhas) */
+  // ===== Canvas (linhas antigas) =====
   onCanvasClick(evt: MouseEvent) {
-    // se estiver conectando portas, ignora cliques no canvas
     if (this.portDraft.from) return;
-
     if (!this.drawMode || !this.lineStyle) return;
+
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = evt.clientX - rect.left;
     const y = evt.clientY - rect.top;
@@ -150,87 +117,81 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     if (!this.drawStartPoint) {
       this.drawStartPoint = { x, y };
     } else {
-      this.connections.push({
-        x1: this.drawStartPoint.x,
-        y1: this.drawStartPoint.y,
-        x2: x,
-        y2: y,
-        style: this.lineStyle
-      });
+      this.connections.push({ x1: this.drawStartPoint.x, y1: this.drawStartPoint.y, x2: x, y2: y, style: this.lineStyle });
       this.drawStartPoint = null;
+      this.emitGraph(); // se quiser considerar essas linhas no JSON, mantenha
     }
   }
 
-  /** Apaga a linha clicada (apenas em deleteMode) */
-  onLineClick(idx: number) {
+  onLineClick(index: number) {
     if (!this.deleteMode) return;
-    this.connections.splice(idx, 1);
+    this.connections.splice(index, 1);
+    this.emitGraph();
   }
 
-  /** Solta serviço do palette no canvas (mantido igual) */
+  // ===== Drop do palette (mantém seu DnD) =====
   onDrop(event: CdkDragDrop<any>) {
     if ((event as any).previousContainer === (event as any).container) return;
+
     const mouseEvt = (event as any).event as MouseEvent;
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = mouseEvt.clientX - rect.left;
     const y = mouseEvt.clientY - rect.top;
+
     const data = (event.item.data || {}) as Partial<ServiceNode>;
     this.droppedServices.push({
       label: data.label ?? (data as any).type ?? 'SERVICE',
       icon: data.icon ?? '',
       x, y
     });
+
+    this.emitGraph();
   }
 
-  /** Clique sobre um nó para apagar (em serviceDeleteMode) */
+  // ===== Nó: apagar / mover =====
   onServiceClick(idx: number, evt: MouseEvent) {
     if (!this.serviceDeleteMode) return;
     evt.stopPropagation();
+
     this.droppedServices.splice(idx, 1);
-    // também remove conexões de/para esse nó e ajusta índices
+
+    // remove conexões relacionadas e realinha índices
     this.portConnections = this.portConnections
       .filter(pc => pc.source.nodeIndex !== idx && pc.target.nodeIndex !== idx)
       .map(pc => ({
         ...pc,
-        source: {
-          nodeIndex: pc.source.nodeIndex > idx ? pc.source.nodeIndex - 1 : pc.source.nodeIndex,
-          side: pc.source.side
-        },
-        target: {
-          nodeIndex: pc.target.nodeIndex > idx ? pc.target.nodeIndex - 1 : pc.target.nodeIndex,
-          side: pc.target.side
-        }
+        source: { nodeIndex: pc.source.nodeIndex > idx ? pc.source.nodeIndex - 1 : pc.source.nodeIndex, side: pc.source.side },
+        target: { nodeIndex: pc.target.nodeIndex > idx ? pc.target.nodeIndex - 1 : pc.target.nodeIndex, side: pc.target.side },
       }));
+
+    this.emitGraph();
   }
 
-  /** Inicia drag manual de um nó (mantido) */
   startNodeDrag(i: number, evt: MouseEvent) {
-    if (this.serviceDeleteMode) return;  // impede drag no modo excluir
-    if ((evt.target as HTMLElement).classList.contains('port')) return; // não começa drag se clicou na porta
-
+    if (this.serviceDeleteMode) return;
+    if ((evt.target as HTMLElement).classList.contains('port')) return; // não inicia drag se clicou na porta
     evt.preventDefault();
+
     this.draggingIndex = i;
     const nodeRect = (evt.target as HTMLElement).closest('.node')!.getBoundingClientRect();
     this.offsetX = evt.clientX - nodeRect.left;
     this.offsetY = evt.clientY - nodeRect.top;
 
-    const moveSub = fromEvent<MouseEvent>(document, 'mousemove')
-      .subscribe(m => this.onNodeMove(m));
-    const upSub = fromEvent<MouseEvent>(document, 'mouseup')
-      .subscribe(() => this.endNodeDrag());
-
-    this.subs.add(moveSub);
-    this.subs.add(upSub);
+    const moveSub = fromEvent<MouseEvent>(document, 'mousemove').subscribe(m => this.onNodeMove(m));
+    const upSub   = fromEvent<MouseEvent>(document, 'mouseup').subscribe(() => this.endNodeDrag());
+    this.subs.add(moveSub); this.subs.add(upSub);
   }
 
   private onNodeMove(evt: MouseEvent) {
     if (this.draggingIndex === null) return;
+
     this.ngZone.run(() => {
       const rect = this.canvasRef.nativeElement.getBoundingClientRect();
       let x = evt.clientX - rect.left - this.offsetX;
       let y = evt.clientY - rect.top - this.offsetY;
       x = Math.max(0, Math.min(x, rect.width));
       y = Math.max(0, Math.min(y, rect.height));
+
       this.droppedServices[this.draggingIndex!] = {
         ...this.droppedServices[this.draggingIndex!],
         x, y
@@ -242,23 +203,24 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.draggingIndex = null;
     this.subs.unsubscribe();
     this.subs = new Subscription();
+    // mover nó não altera o HCL (não emite)
   }
 
-  // ====== Portas: cálculo de posição e interação ======
-
-  /** Coordenadas absolutas da porta no canvas */
+  // ===== Portas =====
   getPortXY(ref: PortRef): { x: number; y: number } {
     const nodeEl = this.nodeElems?.toArray()[ref.nodeIndex]?.nativeElement;
     if (!nodeEl) return { x: 0, y: 0 };
+
     const canvasRect = this.canvasRef.nativeElement.getBoundingClientRect();
     const rect = nodeEl.getBoundingClientRect();
     const midX = rect.left - canvasRect.left + rect.width / 2;
-    const midY = rect.top - canvasRect.top + rect.height / 2;
+    const midY = rect.top  - canvasRect.top  + rect.height / 2;
+
     switch (ref.side) {
-      case 'top':    return { x: midX, y: rect.top - canvasRect.top };
+      case 'top':    return { x: midX, y: rect.top    - canvasRect.top };
       case 'right':  return { x: rect.right - canvasRect.left, y: midY };
       case 'bottom': return { x: midX, y: rect.bottom - canvasRect.top };
-      case 'left':   return { x: rect.left - canvasRect.left, y: midY };
+      case 'left':   return { x: rect.left  - canvasRect.left, y: midY };
     }
   }
 
@@ -273,26 +235,23 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     if (!from) return;
 
     const target: PortRef = { nodeIndex, side };
+    // prevenir clique na mesma porta
     if (from.nodeIndex === target.nodeIndex && from.side === target.side) {
       this.portDraft = { from: null };
       return;
     }
 
     const style: 'dashed' | 'solid' = (this.lineStyle ?? 'solid');
-    this.portConnections = [
-      ...this.portConnections,
-      { source: from, target, style }
-    ];
+    this.portConnections = [...this.portConnections, { source: from, target, style }];
     this.portDraft = { from: null };
+
+    this.emitGraph();
   }
 
   onCanvasMouseMove(ev: MouseEvent) {
     if (!this.portDraft.from) return;
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    this.portDraft = {
-      ...this.portDraft,
-      toXY: { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
-    };
+    this.portDraft = { ...this.portDraft, toXY: { x: ev.clientX - rect.left, y: ev.clientY - rect.top } };
   }
 
   onCanvasMouseLeave() {
@@ -302,12 +261,10 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
   onPortLineClick(index: number) {
     if (!this.deleteMode) return;
     this.portConnections = this.portConnections.filter((_, i) => i !== index);
+    this.emitGraph();
   }
 
-  /**
-   * Limpa tudo: serviços, conexões e modos.
-   * Chame este método quando o Topbar emitir `newArchitecture`.
-   */
+  // ===== Reset total (Topbar chama) =====
   public clearAll() {
     this.droppedServices = [];
     this.connections = [];
@@ -318,5 +275,120 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.lineStyle = null;
     this.drawStartPoint = null;
     this.portDraft = { from: null };
+    this.emitGraph();
+  }
+
+  // ======= JSON do grafo -> TerraformPreview gera HCL =======
+  private emitGraph() {
+    this.graphChange.emit(this.generateConfigJson());
+  }
+
+  private normalizeType(label: string): string {
+    const s = label.trim().toLowerCase();
+    if (s.includes('dynamo')) return 'dynamodb';
+    if (s.includes('glue'))   return 'glue';
+    if (s.includes('ecs'))    return 'ecs';
+    if (s.includes('ec2'))    return 'ec2';
+    if (s.includes('vpc'))    return 'vpc';
+    return s;
+  }
+
+  /** Gera um JSON simples de infra (variables, data e resources) */
+  private generateConfigJson(): any {
+    const nodes = this.droppedServices.map((n, idx) => ({
+      id: `node_${idx}`,
+      type: this.normalizeType(n.label),
+      label: n.label
+    }));
+
+    const edges = this.portConnections.map(pc => ({
+      source: `node_${pc.source.nodeIndex}`,
+      target: `node_${pc.target.nodeIndex}`
+    }));
+
+    const resources: any[] = [];
+    const dataBlocks: any[] = [];
+    const variables: any[] = [];
+
+    // DynamoDB: uma tabela por nó
+    const dynamoNodes = nodes.filter(n => n.type === 'dynamodb');
+    dynamoNodes.forEach((n, i) => {
+      const name = `dynamo_${i + 1}`;
+      resources.push({
+        type: 'aws_dynamodb_table',
+        name,
+        properties: {
+          name: name,
+          billing_mode: 'PAY_PER_REQUEST',
+          hash_key: 'id'
+        },
+        blocks: [{ name: 'attribute', body: { name: 'id', type: 'S' } }]
+      });
+    });
+
+    // Glue base (se houver Glue no grafo)
+    const hasGlue = nodes.some(n => n.type === 'glue');
+    if (hasGlue) {
+      dataBlocks.push({
+        type: 'aws_iam_policy_document',
+        name: 'glue_assume',
+        properties: {},
+        blocks: [
+          {
+            name: 'statement',
+            body: {
+              actions: ['sts:AssumeRole'],
+              principals: { type: 'Service', identifiers: ['glue.amazonaws.com'] }
+            }
+          }
+        ]
+      });
+
+      resources.push({
+        type: 'aws_iam_role',
+        name: 'glue_role',
+        properties: {
+          name: 'iac-glue-role',
+          assume_role_policy: '${data.aws_iam_policy_document.glue_assume.json}'
+        }
+      });
+
+      resources.push({
+        type: 'aws_glue_catalog_database',
+        name: 'db',
+        properties: { name: 'iac_db' }
+      });
+    }
+
+    // Ligações Glue <-> Dynamo viram crawlers
+    edges.forEach((e, idx) => {
+      const s = nodes.find(n => n.id === e.source);
+      const t = nodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+
+      const pair = [s, t];
+      const glue   = pair.find(n => n.type === 'glue');
+      const dynamo = pair.find(n => n.type === 'dynamodb');
+
+      if (glue && dynamo) {
+        const dynIndex = dynamoNodes.findIndex(d => d.id === dynamo.id);
+        const dynRes = `dynamo_${dynIndex + 1}`;
+
+        resources.push({
+          type: 'aws_glue_crawler',
+          name: `glue_to_${dynRes}_${idx + 1}`,
+          properties: {
+            name: `glue-to-${dynRes}-${idx + 1}`,
+            role: '${aws_iam_role.glue_role.arn}',
+            database_name: '${aws_glue_catalog_database.db.name}'
+          },
+          blocks: [
+            { name: 'dynamodb_target', body: { path: '${aws_dynamodb_table.' + dynRes + '.name}' } }
+          ]
+        });
+      }
+    });
+
+    return { variables, data: dataBlocks, resources };
   }
 }

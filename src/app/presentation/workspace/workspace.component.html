@@ -13,10 +13,15 @@
 
     <div class="main-content">
       <div class="canvas-wrapper">
-        <app-canvas #canvas></app-canvas>
+        <app-canvas
+          #canvas
+          (graphChange)="terraformJson = $event"
+        ></app-canvas>
       </div>
       <div class="terraform-wrapper">
-        <app-terraform-preview></app-terraform-preview>
+        <app-terraform-preview
+          [configJson]="terraformJson"
+        ></app-terraform-preview>
       </div>
     </div>
   </div>

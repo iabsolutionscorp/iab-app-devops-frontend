@@ -4,7 +4,6 @@ import { ServicePaletteComponent } from '../service-palette/service-palette.comp
 import { CanvasComponent } from '../canvas/canvas.component';
 import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
 
-
 @Component({
   selector: 'app-workspace',
   standalone: true,
@@ -18,15 +17,17 @@ import { TerraformPreviewComponent } from '../terraform-preview/terraform-previe
   styleUrls: ['./workspace.component.css']
 })
 export class WorkspaceComponent {
-  /** Nome atual do projeto */
   projectName = 'novo projeto';
 
   @ViewChild('canvas') canvas!: CanvasComponent;
 
+  // JSON que vai para o TerraformPreview
+  terraformJson: any = {};
+
   onNewArchitecture() {
     this.canvas.clearAll();
-    // reseta também o nome do projeto
     this.projectName = 'novo projeto';
+    this.terraformJson = {};
   }
 
   onProjectNameChange(newName: string) {
