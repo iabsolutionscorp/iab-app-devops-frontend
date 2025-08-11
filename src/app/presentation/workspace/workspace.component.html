@@ -11,12 +11,13 @@
       <app-service-palette></app-service-palette>
     </div>
 
-    <div class="main-content">
-      <!-- Canvas -->
+    <!-- MAIN: canvas | splitter | terraform -->
+    <div class="main-content" #mainContent>
       <div class="canvas-wrapper">
-        <app-canvas #canvas></app-canvas>
+        <!-- Canvas emitindo o JSON pro Terraform preview -->
+        <app-canvas #canvas (graphChange)="terraformJson = $event"></app-canvas>
 
-        <!-- ===== Gaveta do prompt colada no lado ESQUERDO do grid ===== -->
+        <!-- ===== Gaveta do prompt colada no lado ESQUERDO do canvas ===== -->
         <div class="prompt-float" [class.open]="promptOpen">
           <button class="prompt-toggle"
                   (click)="togglePrompt()"
@@ -34,15 +35,21 @@
               (promptSubmit)="onPromptSubmit($event)"
               (replace)="onPromptReplace()"
             ></app-ia-prompt>
-
           </div>
         </div>
         <!-- ===== FIM da gaveta ===== -->
       </div>
 
-      <!-- Preview à direita -->
-      <div class="terraform-wrapper">
-        <app-terraform-preview></app-terraform-preview>
+      <!-- divisor arrastável -->
+      <div class="splitter" (mousedown)="startResize($event)"></div>
+
+      <!-- Painel Terraform à direita (redimensionável) -->
+      <div class="terraform-wrapper dark" #terraformPane>
+        <div class="title">Terraform Configuration</div>
+        <app-terraform-preview
+          [configJson]="terraformJson"
+          (liveConfig)="onLiveConfig($event)"
+        ></app-terraform-preview>
       </div>
     </div>
   </div>

@@ -1,8 +1,11 @@
-<div class="tf-preview">
-  <h3>Terraform Configuration</h3>
+<div class="terraform-preview">
   <textarea
-    class="tf-textarea"
-    readonly
-    [value]="terraformCode"
+    class="codearea"
+    [(ngModel)]="hclText"
+    (ngModelChange)="onEditorChange($event)"
+    spellcheck="false"
+    placeholder="# Terraform gerado aparecerá aqui (edite para refletir no canvas)"
   ></textarea>
+
+  <div *ngIf="parseError" class="error-tip">{{ parseError }}</div>
 </div>

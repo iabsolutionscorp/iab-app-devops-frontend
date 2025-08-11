@@ -1,31 +1,63 @@
-import {
-  Component,
-  Input,
-  OnChanges,
-  SimpleChanges
-} from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TerraformGeneratorService } from '../../infra/services/terraform-generator.service';
+import { FormsModule } from '@angular/forms';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
+
+import { TerraformGeneratorService } from '../../infra/services/terraform-generator.service'; // MAIN
+import { TerraformHclParserService } from '../../services/terraform-hcl-parser.service';       // MESCLA
 
 @Component({
   selector: 'app-terraform-preview',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './terraform-preview.component.html',
-  styleUrls: ['./terraform-preview.component.css']
+  styleUrls: ['./terraform-preview.component.css'],
 })
-export class TerraformPreviewComponent implements OnChanges {
-  /** JSON de entrada: { resources: [...] } */
-  @Input() configJson: any;
+export class TerraformPreviewComponent implements OnInit, OnChanges, OnDestroy {
+  @Input() configJson: any = {};
+  @Output() liveConfig = new EventEmitter<any>();
 
-  /** HCL gerado */
-  terraformCode = '';
+  hclText = '';
+  parseError: string | null = null;
 
-  constructor(private gen: TerraformGeneratorService) {}
+  private programmatic = false;
+  private input$ = new Subject<string>();
+  private sub?: Subscription;
 
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['configJson']) {
-      this.terraformCode = this.gen.generate(this.configJson || {});
+  constructor(
+    private gen: TerraformGeneratorService,
+    private parser: TerraformHclParserService
+  ) {}
+
+  ngOnInit(): void {
+    this.sub = this.input$
+      .pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe(text => {
+        if (this.programmatic) return;
+        try {
+          const parsed = this.parser.parse(text || '');
+          this.parseError = null;
+          this.liveConfig.emit(parsed);
+        } catch {
+          this.parseError = 'Não foi possível interpretar este Terraform.';
+        }
+      });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ('configJson' in changes) {
+      const newHcl = this.gen.generate(this.configJson || {});
+      this.programmatic = true;
+      this.hclText = newHcl;
+      setTimeout(() => (this.programmatic = false));
     }
+  }
+
+  onEditorChange(value: string) {
+    this.input$.next(value ?? '');
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
   }
 }

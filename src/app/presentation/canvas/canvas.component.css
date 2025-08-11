@@ -99,3 +99,103 @@
   font-size: 13px;
   text-align: center;
 }
+/* ===== Portas dos nós ===== */
+.port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid #1c2533;
+  background: #fff;
+  cursor: crosshair;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  transition: transform .08s ease;
+}
+.port:hover { transform: scale(1.15); }
+
+.port.top    { top: -6px; left: 50%; transform: translate(-50%, -50%); }
+.port.right  { right: -6px; top: 50%; transform: translate(50%, -50%); }
+.port.bottom { bottom: -6px; left: 50%; transform: translate(-50%, 50%); }
+.port.left   { left: -6px; top: 50%; transform: translate(-50%, -50%); }
+
+/* Ports menores, circulares e azuis */
+.node .port {
+  --port-size: 6px;                 /* ajuste aqui o tamanho */
+  --port-offset: calc(var(--port-size) / 2);
+
+  position: absolute;
+  width: var(--port-size);
+  height: var(--port-size);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #2b6fff;         /* azul */
+  outline: none;
+  padding: 0;
+  cursor: crosshair;
+  -webkit-appearance: none;
+  appearance: none;
+
+  /* anel externo sutil (tipo o que já tinha no visual) */
+  box-shadow: 0 0 0 1.5px #0f1a2a;
+}
+
+.node .port:hover {
+  box-shadow: 0 0 0 3px rgba(43,111,255,.25), 0 0 0 2px #0f1a2a;
+}
+
+.node .port:active { background: #2b6fff20; }
+
+/* posicionamento nas 4 bordas */
+.node .port.top {
+  top: calc(-1 * var(--port-offset));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node .port.right {
+  right: calc(-1 * var(--port-offset));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node .port.bottom {
+  bottom: calc(-1 * var(--port-offset));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node .port.left {
+  left: calc(-1 * var(--port-offset));
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Ports escondidas por padrão */
+.node .port {
+  opacity: 0;
+  pointer-events: none;           /* não clicáveis enquanto escondidas */
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+/* Mostra as ports quando o mouse entra no card */
+.node:hover .port {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mostra todas as ports enquanto está conectando */
+.canvas.show-ports .port {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.node { will-change: left, top; }
+
+.node-label {
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  margin-top: 6px;
+  color: #0f172a; /* ajuste se preferir outra cor */
+}

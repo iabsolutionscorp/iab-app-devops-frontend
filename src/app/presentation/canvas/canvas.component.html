@@ -2,7 +2,8 @@
   <div class="controls">
     <button
       class="icon-btn"
-      (click)="toggleDashedMode()"
+      (click)="toggleDashedMode()
+      "
       [class.active]="drawMode && lineStyle === 'dashed'"
       title="Desenhar tracejado"
     >
@@ -22,9 +23,9 @@
       class="icon-btn"
       (click)="toggleDeleteMode()"
       [class.active]="deleteMode"
-      title="Apagar linha"
+      title="Apagar linhas"
     >
-      <img src="canva/borracha.png" alt="Apagar linha" class="icon-btn-img" />
+      <img src="canva/borracha.png" alt="Apagar linhas" class="icon-btn-img" />
     </button>
 
     <button
@@ -41,13 +42,17 @@
     #canvasRef
     class="canvas"
     [class.service-delete-mode]="serviceDeleteMode"
+    [class.show-ports]="!!portDraft.from"
     cdkDropList
     id="canvas-drop"
     [cdkDropListConnectedTo]="['palette-drop']"
     (cdkDropListDropped)="onDrop($event)"
     (click)="onCanvasClick($event)"
+    (mousemove)="onCanvasMouseMove($event)"
+    (mouseleave)="onCanvasMouseLeave()"
   >
     <svg class="connections">
+      <!-- linhas antigas (click-to-click) -->
       <ng-container *ngFor="let conn of connections; let i = index">
         <line
           class="hit-area"
@@ -56,7 +61,7 @@
           [attr.y1]="conn.y1"
           [attr.x2]="conn.x2"
           [attr.y2]="conn.y2"
-        />
+        ></line>
         <line
           class="visible-line"
           [ngClass]="conn.style"
@@ -64,8 +69,38 @@
           [attr.y1]="conn.y1"
           [attr.x2]="conn.x2"
           [attr.y2]="conn.y2"
-        />
+        ></line>
       </ng-container>
+
+      <!-- novas conexões entre portas -->
+      <ng-container *ngFor="let p of portConnections; let j = index">
+        <line
+          class="hit-area"
+          (click)="onPortLineClick(j)"
+          [attr.x1]="getPortXY(p.source).x"
+          [attr.y1]="getPortXY(p.source).y"
+          [attr.x2]="getPortXY(p.target).x"
+          [attr.y2]="getPortXY(p.target).y"
+        ></line>
+        <line
+          class="visible-line"
+          [ngClass]="p.style"
+          [attr.x1]="getPortXY(p.source).x"
+          [attr.y1]="getPortXY(p.source).y"
+          [attr.x2]="getPortXY(p.target).x"
+          [attr.y2]="getPortXY(p.target).y"
+        ></line>
+      </ng-container>
+
+      <!-- preview enquanto conecta portas -->
+      <line
+        *ngIf="portDraft.from && portDraft.toXY"
+        class="visible-line dashed"
+        [attr.x1]="getPortXY(portDraft.from!).x"
+        [attr.y1]="getPortXY(portDraft.from!).y"
+        [attr.x2]="portDraft.toXY!.x"
+        [attr.y2]="portDraft.toXY!.y"
+      ></line>
     </svg>
 
     <div
@@ -78,6 +113,20 @@
     >
       <img [src]="svc.icon" class="node-icon" />
       <div class="node-label">{{ svc.label }}</div>
+
+      <!-- quatro portas clicáveis -->
+      <button class="port top"
+              (mousedown)="onPortDown(i,'top',$event)"
+              (mouseup)="onPortUp(i,'top',$event)"></button>
+      <button class="port right"
+              (mousedown)="onPortDown(i,'right',$event)"
+              (mouseup)="onPortUp(i,'right',$event)"></button>
+      <button class="port bottom"
+              (mousedown)="onPortDown(i,'bottom',$event)"
+              (mouseup)="onPortUp(i,'bottom',$event)"></button>
+      <button class="port left"
+              (mousedown)="onPortDown(i,'left',$event)"
+              (mouseup)="onPortUp(i,'left',$event)"></button>
     </div>
   </div>
 </div>
