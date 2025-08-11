@@ -14,12 +14,36 @@
     <!-- MAIN: canvas | splitter | terraform -->
     <div class="main-content" #mainContent>
       <div class="canvas-wrapper">
+        <!-- Canvas emitindo o JSON pro Terraform preview -->
         <app-canvas #canvas (graphChange)="terraformJson = $event"></app-canvas>
+
+        <!-- ===== Gaveta do prompt colada no lado ESQUERDO do canvas ===== -->
+        <div class="prompt-float" [class.open]="promptOpen">
+          <button class="prompt-toggle"
+                  (click)="togglePrompt()"
+                  [attr.aria-expanded]="promptOpen"
+                  aria-label="Abrir/fechar prompt de IA">
+            <span *ngIf="!promptOpen">▶</span>
+            <span *ngIf="promptOpen">◀</span>
+          </button>
+
+          <div class="prompt-card" (click)="$event.stopPropagation()">
+            <app-ia-prompt
+              [loading]="promptLoading"
+              [response]="promptResponse"
+              [error]="promptError"
+              (promptSubmit)="onPromptSubmit($event)"
+              (replace)="onPromptReplace()"
+            ></app-ia-prompt>
+          </div>
+        </div>
+        <!-- ===== FIM da gaveta ===== -->
       </div>
 
       <!-- divisor arrastável -->
       <div class="splitter" (mousedown)="startResize($event)"></div>
 
+      <!-- Painel Terraform à direita (redimensionável) -->
       <div class="terraform-wrapper dark" #terraformPane>
         <div class="title">Terraform Configuration</div>
         <app-terraform-preview
