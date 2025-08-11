@@ -56,20 +56,22 @@ export class WorkspaceComponent {
 
   // === AGORA CONECTADO AO ENDPOINT /v1/generate via IacService.generateCode$ ===
   onPromptSubmit(text: string) {
+    if (!text || !text.trim()) {
+      this.promptError = 'Digite um prompt antes de enviar.';
+      return;
+    }
     this.promptOpen = true;
     this.promptLoading = true;
     this.promptError = null;
     this.promptResponse = null;
 
-    // Monte o payload conforme seu modelo
     const req: GenerateIacFileRequest = {
-      description: text,            // se no seu modelo o campo é "prompt", troque aqui
-      type: IacTypeEnum.TERRAFORM,  // ajuste o tipo se necessário
+      prompt: text,
+      type: IacTypeEnum.TERRAFORM,
     } as any;
 
     this.iac.generateCode$(req).subscribe({
       next: ({ blob, filename }) => {
-        // tenta exibir como texto; se não der, mostra aviso com nome do arquivo
         blob.text()
           .then((txt) => {
             this.promptLoading = false;

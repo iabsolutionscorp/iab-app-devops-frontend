@@ -8,13 +8,14 @@ import {GenerateIacFileRequest} from '../model/generate-iac-file-request.model';
 
 @Injectable({ providedIn: 'root' })
 export class IacService {
-  private apiUrl = "http://localhost:8080/v1";
+  private apiUrl = "http://localhost:8080/v1/iac";
   constructor(
     private http: HttpClient
   ) {
   }
 
   generateCode$(req: GenerateIacFileRequest): Observable<{ blob: Blob; filename: string | null }> {
+    console.log(req.prompt)
     return this.http.post(`${this.apiUrl}/generate`, req, {
       observe: 'response',
       responseType: 'blob',
