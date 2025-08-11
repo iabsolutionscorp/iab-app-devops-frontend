@@ -1,37 +1,32 @@
 <div class="ia-prompt">
-  <h3>Prompt de IA</h3>
+  <h3>Gerar Terraform com IA</h3>
 
   <textarea
-    [(ngModel)]="prompt"
-    placeholder="Descreva aqui o que você quer gerar..."
-    (keydown.enter)="onSend()"
+    [(ngModel)]="text"
+    [disabled]="loading"
+    placeholder="Descreva o que você quer (ex.: criar Glue conectado no DynamoDB)..."
   ></textarea>
 
   <div class="actions">
-    <button (click)="onSend()" [disabled]="loading || !prompt.trim()">
-      {{ loading ? 'Enviando...' : 'Enviar' }}
+    <button type="button" (click)="onSubmit()" [disabled]="loading || !text.trim()">
+      Enviar
     </button>
-
-    <button class="ghost" (click)="onClear()" [disabled]="loading && !response">
+    <button type="button" class="ghost" (click)="onClear()" [disabled]="loading || !text">
       Limpar
     </button>
 
-    <span class="spacer"></span>
-
+    <!-- empurra o Substituir para a direita -->
     <button
-      class="primary"
       type="button"
-      *ngIf="!!response && !loading"
-      (click)="replace.emit()"
-      aria-label="Substituir com a resposta"
-      title="Substituir com a resposta"
-    >
+      class="replace"
+      (click)="onReplaceClick()"
+      [disabled]="loading || !response">
       Substituir
     </button>
   </div>
 
   <div class="response" *ngIf="response">
-    <div class="response-title">Resposta</div>
+    <div class="response-title">Resposta da IA</div>
     <pre>{{ response }}</pre>
   </div>
 

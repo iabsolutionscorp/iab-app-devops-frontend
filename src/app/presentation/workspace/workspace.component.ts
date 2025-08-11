@@ -6,7 +6,7 @@ import { ServicePaletteComponent } from '../service-palette/service-palette.comp
 import { CanvasComponent } from '../canvas/canvas.component';
 import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
 import { IaPromptComponent } from '../ia-prompt/ia-prompt';
-
+import { TerraformHclParserService } from '../../services/terraform-hcl-parser.service';
 import { IacService } from '../../infra/services/iac-file.service';
 import { GenerateIacFileRequest } from '../../infra/model/generate-iac-file-request.model';
 import { IacTypeEnum } from '../../infra/model/iac-type.enum';
@@ -50,7 +50,7 @@ export class WorkspaceComponent {
   promptResponse: string | null = null;
   promptError: string | null = null;
 
-  constructor(private iac: IacService) {}
+  constructor(private iac: IacService, private hclParser: TerraformHclParserService) {}
 
   // ----- Resize handlers -----
   startResize(e: MouseEvent) {
@@ -142,7 +142,22 @@ export class WorkspaceComponent {
   }
 
   onPromptReplace(): void {
-    // Se quiser aplicar o retorno da IA direto no editor/canvas, a gente pluga aqui.
-    console.log('Clique em Substituir — implemente a ação aqui.');
-  }
+    if (!this.promptResponse || !this.promptResponse.trim()) {
+      this.promptError = 'Não há resposta da IA para substituir.';
+      return;
+    }
+    try {
+      // 1) interpreta o HCL retornado pela IA em JSON
+      const parsed = this.hclParser.parse(this.promptResponse);
+  
+      // 2) atualiza o preview da direita (vai renderizar o HCL a partir do JSON)
+      this.terraformJson = parsed;
+  
+      // 3) aplica no canvas (recria os serviços/links automaticamente)
+      this.canvas.loadFromConfig(this.terraformJson);
+    } catch (e) {
+      console.error('onPromptReplace parse error:', e);
+      this.promptError = 'Não consegui interpretar o Terraform retornado pela IA.';
+    }
+  }  
 }

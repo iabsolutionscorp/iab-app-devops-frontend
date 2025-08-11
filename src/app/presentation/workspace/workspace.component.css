@@ -181,6 +181,8 @@
   pointer-events: none;
   visibility: hidden;
   z-index: 1;
+  padding: 18px 20px;         /* <<< ADICIONAR */
+  border-radius: 16px; 
 }
 .prompt-float.open .prompt-card {
   transform: translateX(0) scale(1);
@@ -264,5 +266,5 @@
 .sidebar {
   flex: 0 0 300px;   /* tente 380–440px conforme seu gosto */
   max-width: 280px;
-  min-width: 200px;s
-} 
+  min-width: 200px;
+}
