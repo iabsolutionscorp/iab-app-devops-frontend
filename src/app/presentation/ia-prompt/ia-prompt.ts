@@ -22,6 +22,7 @@ export class IaPromptComponent {
 
   /** Emite o texto do prompt quando clicar em Enviar (front-only) */
   @Output() promptSubmit = new EventEmitter<string>();
+  @Output() replace = new EventEmitter<void>();
 
   onSend() {
     const text = this.prompt.trim();

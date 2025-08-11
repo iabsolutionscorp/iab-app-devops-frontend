@@ -11,8 +11,22 @@
     <button (click)="onSend()" [disabled]="loading || !prompt.trim()">
       {{ loading ? 'Enviando...' : 'Enviar' }}
     </button>
+
     <button class="ghost" (click)="onClear()" [disabled]="loading && !response">
       Limpar
+    </button>
+
+    <span class="spacer"></span>
+
+    <button
+      class="primary"
+      type="button"
+      *ngIf="!!response && !loading"
+      (click)="replace.emit()"
+      aria-label="Substituir com a resposta"
+      title="Substituir com a resposta"
+    >
+      Substituir
     </button>
   </div>
 

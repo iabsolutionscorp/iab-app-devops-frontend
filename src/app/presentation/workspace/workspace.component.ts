@@ -70,6 +70,7 @@ export class WorkspaceComponent {
       type: IacTypeEnum.TERRAFORM,
     } as any;
 
+
     this.iac.generateCode$(req).subscribe({
       next: ({ blob, filename }) => {
         blob.text()
@@ -97,5 +98,9 @@ export class WorkspaceComponent {
         console.error('generateCode$ error:', err);
       }
     });
+  }
+
+  onPromptReplace(): void {
+    console.log('Clique em Substituir — implemente a ação aqui.');
   }
 }
