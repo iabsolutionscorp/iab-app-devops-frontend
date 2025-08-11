@@ -4,7 +4,7 @@
     [(ngModel)]="hclText"
     (ngModelChange)="onEditorChange($event)"
     spellcheck="false"
-    placeholder="# Digite/cole Terraform HCL aqui."
+    placeholder="# Terraform gerado aparecerá aqui (edite para refletir no canvas)"
   ></textarea>
 
   <div *ngIf="parseError" class="error-tip">{{ parseError }}</div>

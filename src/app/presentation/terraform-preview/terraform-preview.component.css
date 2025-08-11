@@ -13,11 +13,11 @@
   padding: 14px 16px;
   border-radius: 10px;
   border: 1px solid #20232b;
-  background: #0f1115;            /* mesmo tom do painel */
+  background: #0f1115;
   color: #e7e7e7;
-  font: 13px/1.45 "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font: 13px/1.45 "JetBrains Mono", Menlo, Consolas, monospace;
   white-space: pre;
-  overflow: auto;                  /* apenas o editor rola */
+  overflow: auto;
   resize: none;
   outline: none;
   tab-size: 2;
@@ -27,7 +27,6 @@
   box-shadow: 0 0 0 3px rgba(43,111,255,.18);
 }
 
-/* Scrollbar discreta */
 .codearea::-webkit-scrollbar { width: 8px; height: 8px; }
 .codearea::-webkit-scrollbar-track { background: #101215; }
 .codearea::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 8px; }
