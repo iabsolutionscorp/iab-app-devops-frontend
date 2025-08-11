@@ -334,38 +334,64 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     providers.push({
       name: 'aws',
       properties: {
+        region: 'sa-east-1',
         access_key: 'test',
         secret_key: 'test',
-        region: 'us-east-1',
-        s3_force_path_style: true,
         skip_credentials_validation: true,
-        skip_metadata_api_check: true,
         skip_requesting_account_id: true,
+        skip_metadata_api_check: true,
+        s3_force_path_style: true,
         endpoints: {
-          s3: '${var.localstack_endpoint}',
           dynamodb: '${var.localstack_endpoint}',
-          glue: '${var.localstack_endpoint}',
-          iam: '${var.localstack_endpoint}',
-          sts: '${var.localstack_endpoint}',
+          glue:     '${var.localstack_endpoint}',
+          iam:      '${var.localstack_endpoint}',
+          sts:      '${var.localstack_endpoint}',
+          s3:       '${var.localstack_endpoint}',
         }
       }
     });
   
     // -------------------------
-    // DynamoDB tables
+    // DynamoDB tables (PROVISIONED + TTL + GSI + tags)
     // -------------------------
     const dynamoNodes = nodes.filter(n => n.type === 'dynamodb');
     dynamoNodes.forEach((n, i) => {
-      const name = `dynamo_${i + 1}`;
+      const resName = `dynamo_${i + 1}`;
+      const tableName = resName; // você pode trocar por "GameScores" se quiser
+  
       resources.push({
         type: 'aws_dynamodb_table',
-        name,
+        name: resName,
         properties: {
-          name: name,
-          billing_mode: 'PAY_PER_REQUEST',
-          hash_key: 'id'
+          name: tableName,
+          billing_mode: 'PROVISIONED',
+          read_capacity: 20,
+          write_capacity: 20,
+          hash_key: 'UserId',
+          range_key: 'GameTitle',
+          tags: {
+            Name: tableName,
+            Environment: 'local'
+          }
         },
-        blocks: [{ name: 'attribute', body: { name: 'id', type: 'S' } }]
+        blocks: [
+          { name: 'attribute', body: { name: 'UserId',   type: 'S' } },
+          { name: 'attribute', body: { name: 'GameTitle', type: 'S' } },
+          { name: 'attribute', body: { name: 'TopScore',  type: 'N' } },
+          { name: 'ttl', body: { attribute_name: 'TimeToExist', enabled: false } },
+          {
+            name: 'global_secondary_index',
+            body: {
+              name: 'GameTitleIndex',
+              hash_key: 'GameTitle',
+              range_key: 'TopScore',
+              write_capacity: 10,
+              read_capacity: 10,
+              projection_type: 'INCLUDE',
+              non_key_attributes: ['UserId']
+            }
+          }
+        ]
       });
     });
   
@@ -406,7 +432,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     }
   
     // -------------------------
-    // Crawler para cada Glue <-> Dynamo
+    // Crawler para cada ligação Glue <-> Dynamo
     // -------------------------
     edges.forEach((e, idx) => {
       const s = nodes.find(n => n.id === e.source);
@@ -419,6 +445,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       if (glue && dynamo) {
         const dynIndex = dynamoNodes.findIndex(d => d.id === dynamo.id);
         const dynRes = `dynamo_${dynIndex + 1}`;
+  
         resources.push({
           type: 'aws_glue_crawler',
           name: `glue_to_${dynRes}_${idx + 1}`,
