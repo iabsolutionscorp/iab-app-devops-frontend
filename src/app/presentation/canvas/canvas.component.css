@@ -1,224 +1,138 @@
-.canvas-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
+.controls { margin-bottom: 8px; }
+.icon-btn { border: none; background: none; padding: 6px; cursor: pointer; margin-right: 8px; }
+.icon-btn-img { width: 24px; height: 24px; opacity: 0.6; }
+.icon-btn.active .icon-btn-img, .icon-btn:hover .icon-btn-img { opacity: 1; }
 
-.controls {
-  margin-bottom: 8px;
-}
-
-.icon-btn {
-  border: none;
-  background: none;
-  padding: 6px;
-  cursor: pointer;
-  margin-right: 8px;
-}
-
-.icon-btn-img {
-  width: 24px;
-  height: 24px;
-  opacity: 0.6;
-}
-
-.icon-btn.active .icon-btn-img {
-  opacity: 1;
-}
-
-/* área do canvas com grid pontilhado */
+/* Canvas fixo; pan/zoom ocorrem na .viewport */
 .canvas {
   position: relative;
-  flex: 1;
-  padding: 1rem;
-  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh; /* fundo infinito */
   overflow: hidden;
   cursor: crosshair;
-  background-color: #f5f5f5;
-  background-image: radial-gradient(#ccc 1px, transparent 1px);
+  background:
+    radial-gradient(#d8d8d8 1px, transparent 1px),
+    radial-gradient(#d8d8d8 1px, transparent 1px);
   background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  background-color: #f7f7f9;
 }
 
-.canvas.service-delete-mode {
-  /* opcional: muda cursor para mostrar modo excluir */
-  cursor: pointer;
-}
-
-.connections {
+/* “Tapete” grande para trabalhar longe sem limite */
+.viewport {
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  inset: 0;
+  will-change: transform;
+  min-width: 8000px;
+  min-height: 8000px;
+  background: transparent;
 }
 
-.hit-area {
-  stroke: transparent;
-  stroke-width: 12px;
-  pointer-events: stroke;
-  cursor: pointer;
-}
+/* Linhas */
+.connections { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.hit-area { stroke: transparent; stroke-width: 12px; pointer-events: stroke; cursor: pointer; }
+.visible-line { stroke: #0f1a2a; stroke-width: 2.4px; pointer-events: none; }
+.visible-line.solid { stroke-dasharray: none; }
+.visible-line.dashed { stroke-dasharray: 6 6; }
+.visible-line.preview { stroke: #2b6fff; stroke-width: 2px; stroke-dasharray: 6 6; }
 
-.visible-line {
-  stroke: black;
-  stroke-width: 2px;
-  pointer-events: none;
-}
-
-.visible-line.dashed {
-  stroke-dasharray: 4 4;
-}
-
-.visible-line.solid {
-  stroke-dasharray: none;
-}
-
+/* Nodes */
 .node {
   position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  width: 108px;
+  height: 96px;
+  transform: translate(-50%, -50%); /* ancora no centro */
+  display: flex; flex-direction: column; align-items: center;
   padding: 8px 12px;
-  background: #ffffff;
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  cursor: grab;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 8px 24px rgba(39,48,77,.10);
+  border: 1px solid #e9e9ef;
   user-select: none;
-  box-sizing: border-box;
+  cursor: grab;
+  z-index: 2;
 }
+.node:active { cursor: grabbing; }
+.node-icon { width: 44px; height: 44px; object-fit: contain; margin-top: 6px; }
+.node-label { margin-top: 6px; font-weight: 700; font-size: 13px; color: #0f172a; text-align: center; }
 
-.node:active {
-  cursor: grabbing;
-}
-
-.node-icon {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 4px;
-}
-
-.node-label {
-  font-size: 13px;
-  text-align: center;
-}
-/* ===== Portas dos nós ===== */
+/* === Portas: clicáveis e bonitas === */
 .port {
   position: absolute;
   width: 12px;
   height: 12px;
-  border-radius: 999px;
-  border: 2px solid #1c2533;
-  background: #fff;
-  cursor: crosshair;
-  box-shadow: 0 1px 3px rgba(0,0,0,.12);
-  transition: transform .08s ease;
-}
-.port:hover { transform: scale(1.15); }
-
-.port.top    { top: -6px; left: 50%; transform: translate(-50%, -50%); }
-.port.right  { right: -6px; top: 50%; transform: translate(50%, -50%); }
-.port.bottom { bottom: -6px; left: 50%; transform: translate(-50%, 50%); }
-.port.left   { left: -6px; top: 50%; transform: translate(-50%, -50%); }
-
-/* Ports menores, circulares e azuis */
-.node .port {
-  --port-size: 6px;                 /* ajuste aqui o tamanho */
-  --port-offset: calc(var(--port-size) / 2);
-
-  position: absolute;
-  width: var(--port-size);
-  height: var(--port-size);
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1.5px solid #2b6fff;         /* azul */
-  outline: none;
-  padding: 0;
-  cursor: crosshair;
-  -webkit-appearance: none;
-  appearance: none;
-
-  /* anel externo sutil (tipo o que já tinha no visual) */
-  box-shadow: 0 0 0 1.5px #0f1a2a;
-}
-
-.node .port:hover {
-  box-shadow: 0 0 0 3px rgba(43,111,255,.25), 0 0 0 2px #0f1a2a;
-}
-
-.node .port:active { background: #2b6fff20; }
-
-/* posicionamento nas 4 bordas */
-.node .port.top {
-  top: calc(-1 * var(--port-offset));
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.node .port.right {
-  right: calc(-1 * var(--port-offset));
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.node .port.bottom {
-  bottom: calc(-1 * var(--port-offset));
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.node .port.left {
-  left: calc(-1 * var(--port-offset));
-  top: 50%;
-  transform: translateY(-50%);
-}
-/* Ports escondidas por padrão */
-.node .port {
+  border-radius: 9999px;           /* 100% circular */
+  background: #fff;                /* miolo branco */
+  border: 2px solid #2b6fff;       /* aro azul */
+  box-shadow:
+    0 2px 6px rgba(22, 36, 72, .12),    /* sombra suave */
+    0 0 0 3px rgba(43, 111, 255, .12);  /* glow externo leve */
   opacity: 0;
-  pointer-events: none;           /* não clicáveis enquanto escondidas */
-  transition: opacity .12s ease, transform .12s ease;
+  pointer-events: none;            /* habilito nas regras abaixo */
+  transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease, opacity .12s ease;
+  z-index: 10;                     /* acima de linhas/SVG */
 }
 
-/* Mostra as ports quando o mouse entra no card */
-.node:hover .port {
-  opacity: 1;
-  pointer-events: auto;
+/* miolinho azul */
+.port::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: #2b6fff;
 }
 
-/* Mostra todas as ports enquanto está conectando */
+/* HIT-AREA invisível ampliada (28x28) – facilita o clique mesmo no zoom-out */
+.port::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 28px; height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: transparent;
+  pointer-events: auto; /* captura clique */
+}
+
+/* mostrar e habilitar clique:
+   - ao passar o mouse no node
+   - quando está ligando (canvas.linking)
+   - quando forçado por .show-ports */
+.node:hover .port,
+.canvas.linking .port,
 .canvas.show-ports .port {
   opacity: 1;
   pointer-events: auto;
 }
 
-.node { will-change: left, top; }
-
-.node-label {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1.2;
-  text-align: center;
-  margin-top: 6px;
-  color: #0f172a; /* ajuste se preferir outra cor */
+/* Hover/press com hit-area grande */
+.port:hover,
+.port:focus-visible {
+  transform: scale(1.18);
+  box-shadow:
+    0 4px 14px rgba(22, 36, 72, .18),
+    0 0 0 5px rgba(43, 111, 255, .22);
+  background: #f6f9ff;
 }
-/* === Node compacto === */
-.node {
-  width: 108px;      /* antes 132px */
-  height: 96px;      /* antes 116px */
-  padding: 10px 8px; 
-  gap: 6px;
+.port:active { transform: scale(1.08); background: #eaf1ff; }
+
+/* Posicionamento (12px + 2px borda = 16px) */
+.port.top    { top: -8px;    left: 50%; transform: translate(-50%, -50%); }
+.port.right  { right: -8px;  top: 50%;  transform: translate(50%, -50%);  }
+.port.bottom { bottom: -8px; left: 50%; transform: translate(-50%, 50%);  }
+.port.left   { left: -8px;   top: 50%;  transform: translate(-50%, -50%); }
+
+/* Modos */
+.canvas.service-delete-mode { cursor: pointer; }
+
+.icon-btn i {
+  font-size: 26px;
+  color: #000000;
+  transition: opacity .2s;
 }
 
-.node-icon {
-  width: 44px;       /* antes 56px */
-  height: 44px;
-  object-fit: contain;
-}
-
-.node-label {
-  font-size: 13px;   /* antes 14px */
-  line-height: 1.05;
-  text-align: center;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.icon-btn.active i,
+.icon-btn:hover i {
+  opacity: 1;
+  color: #2b6fff; /* azul no hover/ativo */
 }

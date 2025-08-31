@@ -1,38 +1,33 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
+  HostListener,
   ViewChild,
-  ViewChildren,
-  QueryList,
-  NgZone,
-  AfterViewInit,
-  OnDestroy,
-  Output,
-  EventEmitter,
-  ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
-import { fromEvent, Subscription } from 'rxjs';
+import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 
-interface ServiceNode {
-  label: string;
-  icon: string;
+type LineStyle = 'solid' | 'dashed';
+type PortSide = 'top' | 'right' | 'bottom' | 'left';
+
+interface DroppedService {
   x: number;
   y: number;
+  label: string;
+  icon: string;
 }
 
-interface Connection {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  style: 'dashed' | 'solid';
+interface PortRef {
+  node: number;
+  side: PortSide;
 }
 
-type PortSide = 'top' | 'right' | 'bottom' | 'left';
-interface PortRef { nodeIndex: number; side: PortSide; }
-interface PortConnection { source: PortRef; target: PortRef; style: 'dashed' | 'solid'; }
+interface PortConnection {
+  source: PortRef;
+  target: PortRef;
+  style: LineStyle;
+}
 
 @Component({
   selector: 'app-canvas',
@@ -41,519 +36,225 @@ interface PortConnection { source: PortRef; target: PortRef; style: 'dashed' | '
   templateUrl: './canvas.component.html',
   styleUrls: ['./canvas.component.css'],
 })
-export class CanvasComponent implements AfterViewInit, OnDestroy {
+export class CanvasComponent implements AfterViewInit {
   @ViewChild('canvasRef', { static: true }) canvasRef!: ElementRef<HTMLDivElement>;
-  @ViewChildren('nodeElem', { read: ElementRef }) nodeElems!: QueryList<ElementRef<HTMLDivElement>>;
+  @ViewChild('viewportRef', { static: true }) viewportRef!: ElementRef<HTMLDivElement>;
 
-  /** Emite o JSON do grafo para o Workspace -> TerraformPreview */
-  @Output() graphChange = new EventEmitter<any>();
+  // Pan/zoom
+  scale = 1;
+  panX = 0;
+  panY = 0;
 
-  // Estado
-  droppedServices: ServiceNode[] = [];
-  connections: Connection[] = []; // linhas “antigas” (click-to-click) — mantidas
+  // Dados
+  droppedServices: DroppedService[] = [];
   portConnections: PortConnection[] = [];
-  portDraft: { from: PortRef | null; toXY?: { x: number; y: number } } = { from: null };
 
-  // Modos UI (iguais aos seus botões)
-  drawMode = false;
+  // Estilos/modos
+  lineStyle: LineStyle = 'solid';
   deleteMode = false;
   serviceDeleteMode = false;
-  lineStyle: 'dashed' | 'solid' | null = null;
-  private drawStartPoint: { x: number; y: number } | null = null;
 
-  // Drag interno do nó
-  private draggingIndex: number | null = null;
-  private offsetX = 0;
-  private offsetY = 0;
-  private subs = new Subscription();
+  // Link em progresso (preview)
+  linkingFrom: PortRef | null = null;
+  mouseWorldX = 0;
+  mouseWorldY = 0;
 
-  constructor(private ngZone: NgZone, private cdr: ChangeDetectorRef) {}
-  ngAfterViewInit(): void {}
-  ngOnDestroy(): void { this.subs.unsubscribe(); }
+  // Drag de node
+  private draggingNodeIndex: number | null = null;
+  private dragStart = { x: 0, y: 0, nodeX: 0, nodeY: 0 };
+  private spacePressed = false;
 
-  // ===== Botões de modo =====
-  toggleDashedMode() {
-    this.drawMode = !(this.drawMode && this.lineStyle === 'dashed');
-    if (this.drawMode) { this.deleteMode = false; this.serviceDeleteMode = false; this.lineStyle = 'dashed'; }
-    else { this.lineStyle = null; }
-    this.drawStartPoint = null;
+  // card size (centro como origem)
+  readonly NODE_W = 108;
+  readonly NODE_H = 96;
+
+  get transform(): string {
+    return `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+  }
+  get transformOrigin(): string { return '0 0'; }
+
+  ngAfterViewInit(): void {
+    const W = 8000, H = 8000;
+    this.panX = -(W - window.innerWidth) / 2;
+    this.panY = -(H - window.innerHeight) / 2;
   }
 
-  toggleSolidMode() {
-    this.drawMode = !(this.drawMode && this.lineStyle === 'solid');
-    if (this.drawMode) { this.deleteMode = false; this.serviceDeleteMode = false; this.lineStyle = 'solid'; }
-    else { this.lineStyle = null; }
-    this.drawStartPoint = null;
+  /* ================= ZOOM / PAN ================= */
+  zoomIn(): void  { this.scale = Math.min(this.scale * 1.1, 3); }
+  zoomOut(): void { this.scale = Math.max(this.scale / 1.1, 0.2); }
+  resetView(): void { this.scale = 1; this.panX = 0; this.panY = 0; }
+  fitToScreen(): void { this.resetView(); }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(e: KeyboardEvent): void {
+    if (e.code === 'Space') this.spacePressed = true;
+    if ((e.ctrlKey || e.metaKey) && e.key === '+') { e.preventDefault(); this.zoomIn(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); this.zoomOut(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); this.resetView(); }
+    if (e.code === 'Escape') this.cancelLinking();
+    if (e.code === 'KeyE') this.toggleServiceDeleteMode();
+  }
+  @HostListener('window:keyup', ['$event'])
+  onKeyUp(e: KeyboardEvent): void {
+    if (e.code === 'Space') this.spacePressed = false;
   }
 
-  toggleDeleteMode() {
-    this.deleteMode = !this.deleteMode;
-    if (this.deleteMode) {
-      this.drawMode = false;
-      this.serviceDeleteMode = false;
-      this.lineStyle = null;
-      this.drawStartPoint = null;
+  /* ================= POINTER ================= */
+  onWheel(ev: WheelEvent): void {
+    ev.preventDefault();
+    const d = Math.sign(ev.deltaY);
+    d > 0 ? this.zoomOut() : this.zoomIn();
+  }
+
+  onPointerDown(ev: PointerEvent): void {
+    (ev.target as HTMLElement).setPointerCapture?.(ev.pointerId);
+    if (this.spacePressed) {
+      this.dragStart.x = ev.clientX;
+      this.dragStart.y = ev.clientY;
     }
   }
 
-  toggleServiceDeleteMode() {
-    this.serviceDeleteMode = !this.serviceDeleteMode;
-    if (this.serviceDeleteMode) {
-      this.drawMode = false;
-      this.deleteMode = false;
-      this.lineStyle = null;
-      this.drawStartPoint = null;
-    }
-  }
+  onPointerMove(ev: PointerEvent): void {
+    const pt = this.toWorld(ev.clientX, ev.clientY);
+    this.mouseWorldX = pt.x;
+    this.mouseWorldY = pt.y;
 
-  // ===== Canvas (linhas antigas) =====
-  onCanvasClick(evt: MouseEvent) {
-    if (this.portDraft.from) return;
-    if (!this.drawMode || !this.lineStyle) return;
-
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    const x = evt.clientX - rect.left;
-    const y = evt.clientY - rect.top;
-
-    if (!this.drawStartPoint) {
-      this.drawStartPoint = { x, y };
-    } else {
-      this.connections.push({ x1: this.drawStartPoint.x, y1: this.drawStartPoint.y, x2: x, y2: y, style: this.lineStyle });
-      this.drawStartPoint = null;
-      this.emitGraph(); // se quiser considerar essas linhas no JSON, mantenha
-    }
-  }
-
-  onLineClick(index: number) {
-    if (!this.deleteMode) return;
-    this.connections.splice(index, 1);
-    this.emitGraph();
-  }
-
-  // ===== Drop do palette (mantém seu DnD) =====
-  onDrop(event: CdkDragDrop<any>) {
-    if ((event as any).previousContainer === (event as any).container) return;
-
-    const mouseEvt = (event as any).event as MouseEvent;
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    const x = mouseEvt.clientX - rect.left;
-    const y = mouseEvt.clientY - rect.top;
-
-    const data = (event.item.data || {}) as Partial<ServiceNode>;
-    this.droppedServices.push({
-      label: data.label ?? (data as any).type ?? 'SERVICE',
-      icon: data.icon ?? '',
-      x, y
-    });
-
-    this.emitGraph();
-  }
-
-  // ===== Nó: apagar / mover =====
-  onServiceClick(idx: number, evt: MouseEvent) {
-    if (!this.serviceDeleteMode) return;
-    evt.stopPropagation();
-
-    this.droppedServices.splice(idx, 1);
-
-    // remove conexões relacionadas e realinha índices
-    this.portConnections = this.portConnections
-      .filter(pc => pc.source.nodeIndex !== idx && pc.target.nodeIndex !== idx)
-      .map(pc => ({
-        ...pc,
-        source: { nodeIndex: pc.source.nodeIndex > idx ? pc.source.nodeIndex - 1 : pc.source.nodeIndex, side: pc.source.side },
-        target: { nodeIndex: pc.target.nodeIndex > idx ? pc.target.nodeIndex - 1 : pc.target.nodeIndex, side: pc.target.side },
-      }));
-
-    this.emitGraph();
-  }
-
-  startNodeDrag(i: number, evt: MouseEvent) {
-    if (this.serviceDeleteMode) return;
-    if ((evt.target as HTMLElement).classList.contains('port')) return; // não inicia drag se clicou na porta
-    evt.preventDefault();
-
-    this.draggingIndex = i;
-    const nodeRect = (evt.target as HTMLElement).closest('.node')!.getBoundingClientRect();
-    this.offsetX = evt.clientX - nodeRect.left;
-    this.offsetY = evt.clientY - nodeRect.top;
-
-    const moveSub = fromEvent<MouseEvent>(document, 'mousemove').subscribe(m => this.onNodeMove(m));
-    const upSub   = fromEvent<MouseEvent>(document, 'mouseup').subscribe(() => this.endNodeDrag());
-    this.subs.add(moveSub); this.subs.add(upSub);
-  }
-
-  private onNodeMove(evt: MouseEvent) {
-    if (this.draggingIndex === null) return;
-  
-    this.ngZone.run(() => {
-      const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-      let x = evt.clientX - rect.left - this.offsetX;
-      let y = evt.clientY - rect.top  - this.offsetY;
-      x = Math.max(0, Math.min(x, rect.width));
-      y = Math.max(0, Math.min(y, rect.height));
-  
-      this.droppedServices[this.draggingIndex!] = {
-        ...this.droppedServices[this.draggingIndex!],
-        x, y
-      };
-  
-      // mantém as linhas coladas durante o drag
-      this.cdr.detectChanges();
-    });
-  }
-  
-
-  private endNodeDrag() {
-    this.draggingIndex = null;
-    this.subs.unsubscribe();
-    this.subs = new Subscription();
-    // mover nó não altera o HCL (não emite)
-  }
-
-  // ===== Portas =====
-  getPortXY(ref: PortRef): { x: number; y: number } {
-    // usa o estado (left/top) + tamanho real do elemento
-    const el = this.nodeElems?.toArray()[ref.nodeIndex]?.nativeElement;
-    const node = this.droppedServices[ref.nodeIndex];
-    if (!el || !node) return { x: 0, y: 0 };
-  
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-  
-    // left/top já são relativos ao canvas, então é direto
-    const left = node.x;
-    const top  = node.y;
-  
-    switch (ref.side) {
-      case 'top':    return { x: left + w / 2, y: top };
-      case 'right':  return { x: left + w,     y: top + h / 2 };
-      case 'bottom': return { x: left + w / 2, y: top + h };
-      case 'left':   return { x: left,         y: top + h / 2 };
-    }
-  }
-  
-
-  onPortDown(nodeIndex: number, side: PortSide, ev: MouseEvent) {
-    ev.stopPropagation();
-    this.portDraft = { from: { nodeIndex, side } };
-  }
-
-  onPortUp(nodeIndex: number, side: PortSide, ev: MouseEvent) {
-    ev.stopPropagation();
-    const from = this.portDraft.from;
-    if (!from) return;
-
-    const target: PortRef = { nodeIndex, side };
-    // prevenir clique na mesma porta
-    if (from.nodeIndex === target.nodeIndex && from.side === target.side) {
-      this.portDraft = { from: null };
+    if (this.spacePressed && (ev.buttons & 1)) {
+      this.panX += ev.clientX - this.dragStart.x;
+      this.panY += ev.clientY - this.dragStart.y;
+      this.dragStart.x = ev.clientX;
+      this.dragStart.y = ev.clientY;
       return;
     }
 
-    const style: 'dashed' | 'solid' = (this.lineStyle ?? 'solid');
-    this.portConnections = [...this.portConnections, { source: from, target, style }];
-    this.portDraft = { from: null };
-
-    this.emitGraph();
+    if (this.draggingNodeIndex !== null) {
+      const i = this.draggingNodeIndex;
+      this.droppedServices[i].x = this.dragStart.nodeX + (pt.x - this.dragStart.x);
+      this.droppedServices[i].y = this.dragStart.nodeY + (pt.y - this.dragStart.y);
+    }
   }
 
-  onCanvasMouseMove(ev: MouseEvent) {
-    if (!this.portDraft.from) return;
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    this.portDraft = { ...this.portDraft, toXY: { x: ev.clientX - rect.left, y: ev.clientY - rect.top } };
+  onPointerUp(_: PointerEvent): void {
+    this.draggingNodeIndex = null;
   }
 
-  onCanvasMouseLeave() {
-    this.portDraft = { from: null };
+  /* ================= PALETA / DROP ================= */
+  onDrop(event: CdkDragDrop<any>): void {
+    const data = event.item?.data;
+    if (!data) return;
+    // @ts-ignore
+    const dp = event.dropPoint ?? { x: event?.event?.clientX, y: event?.event?.clientY };
+    const pt = this.toWorld(dp.x, dp.y);
+    this.droppedServices.push({
+      x: pt.x, y: pt.y,
+      label: data.label ?? 'Service',
+      icon: data.icon ?? 'assets/icon.png'
+    });
   }
 
-  onPortLineClick(index: number) {
-    if (!this.deleteMode) return;
-    this.portConnections = this.portConnections.filter((_, i) => i !== index);
-    this.emitGraph();
+  /* ================= LIGAÇÕES SIMPLES ================= */
+  onPortClick(node: number, side: PortSide, ev: MouseEvent): void {
+    ev.stopPropagation();
+    const port: PortRef = { node, side };
+
+    // Se clicar na mesma porta novamente → cancela
+    if (this.linkingFrom && this.linkingFrom.node === node && this.linkingFrom.side === side) {
+      this.cancelLinking();
+      return;
+    }
+
+    // Se não existe origem -> começa
+    if (!this.linkingFrom) {
+      this.linkingFrom = port;
+      return;
+    }
+
+    // Se já existe origem -> finaliza
+    this.portConnections.push({
+      source: this.linkingFrom,
+      target: port,
+      style: this.lineStyle,
+    });
+    this.linkingFrom = null;
   }
 
-  // ===== Reset total (Topbar chama) =====
-  public clearAll() {
-    this.droppedServices = [];
-    this.connections = [];
-    this.portConnections = [];
-    this.drawMode = false;
-    this.deleteMode = false;
-    this.serviceDeleteMode = false;
-    this.lineStyle = null;
-    this.drawStartPoint = null;
-    this.portDraft = { from: null };
-    this.emitGraph();
+  cancelLinking(): void { this.linkingFrom = null; }
+
+  onPortLineClick(index: number): void {
+    if (this.deleteMode) this.portConnections.splice(index, 1);
   }
 
-  // ======= JSON do grafo -> TerraformPreview gera HCL =======
-  private emitGraph() {
-    this.graphChange.emit(this.generateConfigJson());
+  toggleSolidMode(): void  { this.lineStyle = 'solid'; }
+  toggleDashedMode(): void { this.lineStyle = 'dashed'; }
+  toggleDeleteMode(): void { this.deleteMode = !this.deleteMode; }
+  toggleServiceDeleteMode(): void { this.serviceDeleteMode = !this.serviceDeleteMode; }
+
+  startNodeDrag(i: number, ev: MouseEvent): void {
+    ev.stopPropagation();
+    const pt = this.toWorld(ev.clientX, ev.clientY);
+    this.draggingNodeIndex = i;
+    this.dragStart = { x: pt.x, y: pt.y, nodeX: this.droppedServices[i].x, nodeY: this.droppedServices[i].y };
   }
 
-  private normalizeType(label: string): string {
-    const s = label.trim().toLowerCase();
-    if (s.includes('dynamo')) return 'dynamodb';
-    if (s.includes('glue'))   return 'glue';
-    if (s.includes('ecs'))    return 'ecs';
-    if (s.includes('ec2'))    return 'ec2';
-    if (s.includes('vpc'))    return 'vpc';
-    return s;
-  }
+  onServiceClick(i: number, ev: MouseEvent): void {
+    ev.stopPropagation();
+    if (!this.serviceDeleteMode) return;
 
-  /** Gera um JSON simples de infra (variables, data e resources) */
-  private generateConfigJson(): any {
-    const nodes = this.droppedServices.map((n, idx) => ({
-      id: `node_${idx}`,
-      type: this.normalizeType(n.label),
-      label: n.label
+    // apaga conexões do serviço
+    this.portConnections = this.portConnections.filter(pc => pc.source.node !== i && pc.target.node !== i);
+    // remove serviço e reindexa
+    this.droppedServices.splice(i, 1);
+    this.portConnections = this.portConnections.map(pc => ({
+      source: { node: pc.source.node > i ? pc.source.node - 1 : pc.source.node, side: pc.source.side },
+      target: { node: pc.target.node > i ? pc.target.node - 1 : pc.target.node, side: pc.target.side },
+      style: pc.style,
     }));
-  
-    const edges = this.portConnections.map(pc => ({
-      source: `node_${pc.source.nodeIndex}`,
-      target: `node_${pc.target.nodeIndex}`
-    }));
-  
-    const resources: any[] = [];
-    const dataBlocks: any[] = [];
-    const variables: any[] = [];
-    const providers: any[] = [];
-  
-    // -------------------------
-    // LocalStack provider + var
-    // -------------------------
-    variables.push({
-      name: 'localstack_endpoint',
-      type: 'string',
-      default: 'http://localhost:4566',
-      description: 'Endpoint do LocalStack'
-    });
-  
-    providers.push({
-      name: 'aws',
-      properties: {
-        region: 'sa-east-1',
-        access_key: 'test',
-        secret_key: 'test',
-        skip_credentials_validation: true,
-        skip_requesting_account_id: true,
-        skip_metadata_api_check: true,
-        s3_force_path_style: true,
-        endpoints: {
-          dynamodb: '${var.localstack_endpoint}',
-          glue:     '${var.localstack_endpoint}',
-          iam:      '${var.localstack_endpoint}',
-          sts:      '${var.localstack_endpoint}',
-          s3:       '${var.localstack_endpoint}',
-        }
-      }
-    });
-  
-    // -------------------------
-    // DynamoDB tables (PROVISIONED + TTL + GSI + tags)
-    // -------------------------
-    const dynamoNodes = nodes.filter(n => n.type === 'dynamodb');
-    dynamoNodes.forEach((n, i) => {
-      const resName = `dynamo_${i + 1}`;
-      const tableName = resName; // você pode trocar por "GameScores" se quiser
-  
-      resources.push({
-        type: 'aws_dynamodb_table',
-        name: resName,
-        properties: {
-          name: tableName,
-          billing_mode: 'PROVISIONED',
-          read_capacity: 20,
-          write_capacity: 20,
-          hash_key: 'UserId',
-          range_key: 'GameTitle',
-          tags: {
-            Name: tableName,
-            Environment: 'local'
-          }
-        },
-        blocks: [
-          { name: 'attribute', body: { name: 'UserId',   type: 'S' } },
-          { name: 'attribute', body: { name: 'GameTitle', type: 'S' } },
-          { name: 'attribute', body: { name: 'TopScore',  type: 'N' } },
-          { name: 'ttl', body: { attribute_name: 'TimeToExist', enabled: false } },
-          {
-            name: 'global_secondary_index',
-            body: {
-              name: 'GameTitleIndex',
-              hash_key: 'GameTitle',
-              range_key: 'TopScore',
-              write_capacity: 10,
-              read_capacity: 10,
-              projection_type: 'INCLUDE',
-              non_key_attributes: ['UserId']
-            }
-          }
-        ]
-      });
-    });
-  
-    // -------------------------
-    // Glue base (se houver Glue)
-    // -------------------------
-    const hasGlue = nodes.some(n => n.type === 'glue');
-    if (hasGlue) {
-      dataBlocks.push({
-        type: 'aws_iam_policy_document',
-        name: 'glue_assume',
-        properties: {},
-        blocks: [
-          {
-            name: 'statement',
-            body: {
-              actions: ['sts:AssumeRole'],
-              principals: { type: 'Service', identifiers: ['glue.amazonaws.com'] }
-            }
-          }
-        ]
-      });
-  
-      resources.push({
-        type: 'aws_iam_role',
-        name: 'glue_role',
-        properties: {
-          name: 'iac-glue-role',
-          assume_role_policy: '${data.aws_iam_policy_document.glue_assume.json}'
-        }
-      });
-  
-      resources.push({
-        type: 'aws_glue_catalog_database',
-        name: 'db',
-        properties: { name: 'iac_db' }
-      });
-    }
-  
-    // -------------------------
-    // Crawler para cada ligação Glue <-> Dynamo
-    // -------------------------
-    edges.forEach((e, idx) => {
-      const s = nodes.find(n => n.id === e.source);
-      const t = nodes.find(n => n.id === e.target);
-      if (!s || !t) return;
-  
-      const pair = [s, t];
-      const glue   = pair.find(n => n.type === 'glue');
-      const dynamo = pair.find(n => n.type === 'dynamodb');
-      if (glue && dynamo) {
-        const dynIndex = dynamoNodes.findIndex(d => d.id === dynamo.id);
-        const dynRes = `dynamo_${dynIndex + 1}`;
-  
-        resources.push({
-          type: 'aws_glue_crawler',
-          name: `glue_to_${dynRes}_${idx + 1}`,
-          properties: {
-            name: `glue-to-${dynRes}-${idx + 1}`,
-            role: '${aws_iam_role.glue_role.arn}',
-            database_name: '${aws_glue_catalog_database.db.name}'
-          },
-          blocks: [
-            { name: 'dynamodb_target', body: { path: '${aws_dynamodb_table.' + dynRes + '.name}' } }
-          ]
-        });
-      }
-    });
-  
-    return { variables, providers, data: dataBlocks, resources };
-  }  
-  /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
-  /** Reconstrói nós e conexões a partir de um config JSON (como o gerado pelo parser). */
-  public loadFromConfig(config: any) {
-    // 1) Salva os ícones atuais por tipo (pra não perder ao recarregar)
-    const iconByType = new Map<string, string>();
-    for (const n of this.droppedServices) {
-      const t = this.normalizeType(n.label);
-      if (n.icon && !iconByType.has(t)) iconByType.set(t, n.icon);
-    }
-
-    // 2) Limpa estado
-    this.droppedServices = [];
-    this.connections = [];
-    this.portConnections = [];
-    this.drawMode = false;
-    this.deleteMode = false;
-    this.serviceDeleteMode = false;
-    this.lineStyle = null;
-    this.portDraft = { from: null };
-
-    const resources = Array.isArray(config?.resources) ? config.resources : [];
-
-    // DynamoDB -> nós
-    const dynamoRes = resources.filter((r: any) => r.type === 'aws_dynamodb_table');
-    const dynIndexByName = new Map<string, number>();
-
-    // cria 1 nó Glue se houver algo de Glue
-    const hasGlue =
-      resources.some((r: any) => r.type === 'aws_glue_crawler') ||
-      resources.some((r: any) => r.type === 'aws_glue_catalog_database') ||
-      resources.some((r: any) => r.type === 'aws_iam_role');
-
-    let glueIndex: number | null = null;
-    if (hasGlue) {
-      this.droppedServices.push({
-        label: 'Glue',
-        icon: iconByType.get('glue') ?? this.defaultIconFor('glue'),
-        x: 200,
-        y: 200
-      });
-      glueIndex = 0;
-    }
-
-    // posiciona os Dynamo à direita do Glue
-    const startX = hasGlue ? 460 : 200;
-    let dx = startX;
-    const y = 200;
-
-    dynamoRes.forEach((r: any) => {
-      const nodeLabel = 'Dynamo';
-      this.droppedServices.push({
-        label: nodeLabel,
-        icon: iconByType.get('dynamodb') ?? this.defaultIconFor('dynamodb'),
-        x: dx,
-        y
-      });
-      const idx = this.droppedServices.length - 1;
-      dynIndexByName.set(r.name, idx);
-      dx += 220;
-    });
-
-    // Conexões: cada glue crawler com dynamodb_target -> link
-    const crawlers = resources.filter((r: any) => r.type === 'aws_glue_crawler');
-    for (const c of crawlers) {
-      const dynBlock = (c.blocks || []).find((b: any) => b.name === 'dynamodb_target');
-      const path: string | undefined = dynBlock?.body?.path;
-      if (!path) continue;
-      const m = /\${aws_dynamodb_table\.([A-Za-z0-9_\-]+)\.name}/.exec(path);
-      if (!m) continue;
-      const dynName = m[1];
-      const dynIdx = dynIndexByName.get(dynName);
-      if (glueIndex !== null && dynIdx !== undefined) {
-        this.portConnections.push({
-          source: { nodeIndex: glueIndex, side: 'right' },
-          target: { nodeIndex: dynIdx, side: 'left' },
-          style: 'solid'
-        });
-      }
-    }
-
-    this.emitGraph();
   }
-  /** Fallback de ícone por tipo – ajuste os paths se forem diferentes no seu projeto. */
-  private defaultIconFor(type: string): string {
-    const map: Record<string, string> = {
-      dynamodb: 'assets/icons/aws/dynamodb.png',
-      glue:     'assets/icons/aws/glue.png',
-      ecs:      'assets/icons/aws/ecs.png',
-      ec2:      'assets/icons/aws/ec2.png',
-      vpc:      'assets/icons/aws/vpc.png',
+
+  /* ================= UTILS ================= */
+  getPortXY(ref: PortRef): { x: number; y: number } {
+    const n = this.droppedServices[ref.node];
+    if (!n) return { x: 0, y: 0 };
+    switch (ref.side) {
+      case 'top':    return { x: n.x,                   y: n.y - this.NODE_H / 2 };
+      case 'bottom': return { x: n.x,                   y: n.y + this.NODE_H / 2 };
+      case 'left':   return { x: n.x - this.NODE_W / 2, y: n.y };
+      case 'right':  return { x: n.x + this.NODE_W / 2, y: n.y };
+    }
+  }
+
+  private toWorld(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.viewportRef.nativeElement.getBoundingClientRect();
+    const x = (clientX - rect.left - this.panX) / this.scale;
+    const y = (clientY - rect.top  - this.panY) / this.scale;
+    return { x, y };
+  }
+
+  clearAll(): void {
+    this.droppedServices = [];
+    this.portConnections = [];
+    this.resetView();
+  }
+  exportConfig(): any {
+    return {
+      scale: this.scale, panX: this.panX, panY: this.panY,
+      style: this.lineStyle,
+      nodes: this.droppedServices,
+      portConnections: this.portConnections,
     };
-    return map[type] ?? '';
+  }
+  loadFromConfig(cfg: any): void { this.importConfig(cfg); }
+  importConfig(cfg: any): void {
+    if (!cfg) return;
+    this.scale = Number(cfg.scale) || 1;
+    this.panX  = Number(cfg.panX)  || 0;
+    this.panY  = Number(cfg.panY)  || 0;
+    this.lineStyle = (cfg.style as LineStyle) || 'solid';
+    this.droppedServices = (cfg.nodes ?? []).map((n: any) => ({
+      x: Number(n.x) || 0, y: Number(n.y) || 0, label: String(n.label ?? ''), icon: String(n.icon ?? '')
+    }));
+    this.portConnections = (cfg.portConnections ?? []).map((pc: any) => ({
+      source: pc.source as PortRef, target: pc.target as PortRef, style: (pc.style as LineStyle) || 'solid'
+    }));
   }
 }
