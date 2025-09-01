@@ -29,6 +29,7 @@ import { fromEvent, Subscription } from 'rxjs';
   ],
 })
 export class WorkspaceComponent {
+  public editorDirty = false;
   projectName = 'novo projeto';
 
   @ViewChild('canvas') canvas!: CanvasComponent;
@@ -77,6 +78,13 @@ export class WorkspaceComponent {
     this.upSub?.unsubscribe();
   }
 
+  onTerraformEdit(value: string) {
+    this.editorDirty = true;
+    if (!this.editorDirty) {
+      this.promptResponse = value;
+    }
+  }  
+
   // ----- Topbar actions -----
   onNewArchitecture() {
     this.canvas.clearAll();
@@ -92,6 +100,7 @@ export class WorkspaceComponent {
   onLiveConfig(config: any) {
     this.terraformJson = config || {};
     this.canvas.loadFromConfig(this.terraformJson);
+    this.editorDirty = false;
   }
 
   // ----- IA Prompt panel -----
@@ -108,37 +117,70 @@ export class WorkspaceComponent {
     this.promptOpen = true;
     this.promptLoading = true;
     this.promptError = null;
-    this.promptResponse = null;
+    if (!this.editorDirty) {
+      this.promptResponse = null;
+    }
 
     const req: GenerateIacFileRequest = {
       prompt: text,
       type: IacTypeEnum.TERRAFORM,
     } as any;
 
-    this.iac.generateCode$(req).subscribe({
-      next: ({ blob, filename }) => {
-        blob.text()
-          .then((txt) => {
-            this.promptLoading = false;
-            try {
-              const parsed = JSON.parse(txt);
-              this.promptResponse = JSON.stringify(parsed, null, 2);
-            } catch {
-              this.promptResponse = txt;
-            }
-          })
-          .catch(() => {
-            this.promptLoading = false;
-            this.promptResponse = `Arquivo gerado${filename ? `: ${filename}` : ''}. (Conteúdo binário — não exibível aqui)`;
-          });
-      },
-      error: (err) => {
-        this.promptLoading = false;
-        this.promptError =
-          err?.error?.message ?? err?.message ?? 'Erro ao gerar IAC.';
-        console.error('generateCode$ error:', err);
+      return void (this.promptLoading = false, this.promptError = null, this.promptResponse = `terraform {
+        required_providers { aws = { source = "hashicorp/aws", version = "~> 5.0" } }
       }
-    });
+      
+      variable "localstack_endpoint" { default = "http://localhost:4566" }
+      
+      provider "aws" {
+        region                      = "sa-east-1"
+        s3_force_path_style         = true
+        skip_credentials_validation = true
+        skip_requesting_account_id  = true
+        skip_metadata_api_check     = true
+        endpoints = {
+          dynamodb = var.localstack_endpoint
+          glue     = var.localstack_endpoint
+          iam      = var.localstack_endpoint
+          sts      = var.localstack_endpoint
+          s3       = var.localstack_endpoint
+          ec2      = var.localstack_endpoint
+          ecs      = var.localstack_endpoint
+        }
+      }
+      
+      resource "aws_dynamodb_table" "dynamo_1" {
+        name         = "test-table"
+        billing_mode = "PAY_PER_REQUEST"
+        hash_key     = "id"
+        attribute { name = "id"; type = "S" }
+      }
+      `);     
+
+    // this.iac.generateCode$(req).subscribe({
+    //   next: ({ blob, filename }) => {
+    //     blob.text()
+    //       .then((txt) => {
+    //         this.promptLoading = false;
+    //         try {
+    //           const parsed = JSON.parse(txt);
+    //           this.promptResponse = JSON.stringify(parsed, null, 2);
+    //         } catch {
+    //           this.promptResponse = txt;
+    //         }
+    //       })
+    //       .catch(() => {
+    //         this.promptLoading = false;
+    //         this.promptResponse = `Arquivo gerado${filename ? `: ${filename}` : ''}. (Conteúdo binário — não exibível aqui)`;
+    //       });
+    //   },
+    //   error: (err) => {
+    //     this.promptLoading = false;
+    //     this.promptError =
+    //       err?.error?.message ?? err?.message ?? 'Erro ao gerar IAC.';
+    //     console.error('generateCode$ error:', err);
+    //   }
+    // });
   }
 
   onPromptReplace(): void {
@@ -155,6 +197,7 @@ export class WorkspaceComponent {
   
       // 3) aplica no canvas (recria os serviços/links automaticamente)
       this.canvas.loadFromConfig(this.terraformJson);
+      this.editorDirty = false;
     } catch (e) {
       console.error('onPromptReplace parse error:', e);
       this.promptError = 'Não consegui interpretar o Terraform retornado pela IA.';

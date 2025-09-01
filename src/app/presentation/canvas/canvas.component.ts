@@ -347,9 +347,315 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
           iam:      '${var.localstack_endpoint}',
           sts:      '${var.localstack_endpoint}',
           s3:       '${var.localstack_endpoint}',
+          ec2:      '${var.localstack_endpoint}',   // <-- ADICIONE ESTA
+          ecs:      '${var.localstack_endpoint}',
         }
       }
     });
+
+    // -------------------------
+    // Helpers de grafo
+    // -------------------------
+    const adj = new Map<string, Set<string>>();
+    for (const e of edges) {
+      if (!adj.has(e.source)) adj.set(e.source, new Set());
+      if (!adj.has(e.target)) adj.set(e.target, new Set());
+      adj.get(e.source)!.add(e.target);
+      adj.get(e.target)!.add(e.source);
+    }
+    const neighbors = (id: string) => Array.from(adj.get(id) ?? []);
+
+    // -------------------------
+    // VPCs (com subnet, route table, associação e SG)
+    // -------------------------
+    const vpcNodes = nodes.filter(n => n.type === 'vpc');
+    const vpcNameById = new Map<string, string>(); // node.id -> terraform name prefix
+    vpcNodes.forEach((n, i) => {
+      const base = `vpc_${i+1}`;
+      vpcNameById.set(n.id, base);
+
+      resources.push({
+        type: 'aws_vpc',
+        name: base,
+        properties: { cidr_block: '10.0.0.0/16' }
+      });
+
+      resources.push({
+        type: 'aws_subnet',
+        name: `${base}_subnet`,
+        properties: {
+          vpc_id: '${aws_vpc.' + base + '.id}',
+          cidr_block: '10.0.1.0/24',
+          map_public_ip_on_launch: true
+        }
+      });
+
+      resources.push({
+        type: 'aws_route_table',
+        name: `${base}_rt`,
+        properties: { vpc_id: '${aws_vpc.' + base + '.id}' }
+      });
+
+      resources.push({
+        type: 'aws_route_table_association',
+        name: `${base}_rta`,
+        properties: {
+          subnet_id: '${aws_subnet.' + `${base}_subnet` + '.id}',
+          route_table_id: '${aws_route_table.' + `${base}_rt` + '.id}'
+        }
+      });
+
+      resources.push({
+        type: 'aws_security_group',
+        name: `${base}_sg`,
+        properties: {
+          name: `${base}-sg`,
+          description: 'default sg',
+          vpc_id: '${aws_vpc.' + base + '.id}'
+        },
+        blocks: [
+          { name: 'ingress', body: { from_port: 0, to_port: 0, protocol: '-1', cidr_blocks: ['0.0.0.0/0'] } },
+          { name: 'egress',  body: { from_port: 0, to_port: 0, protocol: '-1', cidr_blocks: ['0.0.0.0/0'] } },
+        ]
+      });
+    });
+
+    // -------------------------
+    // EC2 (ligado à VPC se houver)
+    // -------------------------
+    const ec2Nodes = nodes.filter(n => n.type === 'ec2');
+    ec2Nodes.forEach((n, i) => {
+      const ec2Name = `ec2_${i+1}`;
+
+      // tenta achar VPC vizinha
+      const vpcNeighbor = neighbors(n.id)
+        .map(id => nodes.find(nn => nn.id === id))
+        .find(nn => nn?.type === 'vpc');
+
+      let vpcBase: string;
+      if (vpcNeighbor) {
+        vpcBase = vpcNameById.get(vpcNeighbor!.id)!;
+      } else {
+        // cria uma VPC mínima dedicada pra este EC2
+        vpcBase = `${ec2Name}_vpc`;
+        resources.push({ type: 'aws_vpc', name: vpcBase, properties: { cidr_block: '10.1.0.0/16' } });
+        resources.push({
+          type: 'aws_subnet',
+          name: `${vpcBase}_subnet`,
+          properties: { vpc_id: '${aws_vpc.' + vpcBase + '.id}', cidr_block: '10.1.1.0/24', map_public_ip_on_launch: true }
+        });
+        resources.push({ type: 'aws_security_group', name: `${vpcBase}_sg`, properties: {
+          name: `${vpcBase}-sg`, vpc_id: '${aws_vpc.' + vpcBase + '.id}'
+        }});
+      }
+
+      // Role/InstanceProfile só se ligar em Dynamo depois (abaixo)
+      resources.push({
+        type: 'aws_instance',
+        name: ec2Name,
+        properties: {
+          ami: 'ami-12345678', // LocalStack mock
+          instance_type: 't3.micro',
+          subnet_id: '${aws_subnet.' + `${vpcBase}_subnet` + '.id}',
+          vpc_security_group_ids: ['${aws_security_group.' + `${vpcBase}_sg` + '.id}']
+        }
+      });
+
+      // Se houver relação EC2 ↔ DynamoDB, cria role/policy/profile:
+      const dynNeighbor = neighbors(n.id)
+        .map(id => nodes.find(nn => nn.id === id))
+        .find(nn => nn?.type === 'dynamodb');
+      if (dynNeighbor) {
+        const dynIndex = dynamoNodes.findIndex(d => d.id === dynNeighbor!.id);
+        const dynRes = `dynamo_${dynIndex + 1}`;
+
+        // role + policy + attach + profile
+        resources.push({
+          type: 'aws_iam_role',
+          name: `${ec2Name}_role`,
+          properties: {
+            name: `${ec2Name}-role`,
+            assume_role_policy: JSON.stringify({
+              Version: '2012-10-17',
+              Statement: [{ Effect: 'Allow', Principal: { Service: 'ec2.amazonaws.com' }, Action: 'sts:AssumeRole' }]
+            })
+          }
+        });
+        resources.push({
+          type: 'aws_iam_role_policy',
+          name: `${ec2Name}_dynamo_policy`,
+          properties: {
+            name: `${ec2Name}-dynamo`,
+            role: '${aws_iam_role.' + `${ec2Name}_role` + '.id}',
+            policy: JSON.stringify({
+              Version: '2012-10-17',
+              Statement: [{
+                Effect: 'Allow',
+                Action: ['dynamodb:GetItem','dynamodb:PutItem','dynamodb:Query','dynamodb:Scan','dynamodb:UpdateItem'],
+                Resource: ['*'] // simplificado p/ LocalStack; poderia apontar p/ ARN da tabela
+              }]
+            })
+          }
+        });
+        resources.push({
+          type: 'aws_iam_instance_profile',
+          name: `${ec2Name}_profile`,
+          properties: { name: `${ec2Name}-profile`, role: '${aws_iam_role.' + `${ec2Name}_role` + '.name}' }
+        });
+
+        // associa o profile à instância
+        const inst = resources.find(r => r.type === 'aws_instance' && r.name === ec2Name);
+        if (inst) { inst.properties['iam_instance_profile'] = '${aws_iam_instance_profile.' + `${ec2Name}_profile` + '.name}'; }
+      }
+    });
+
+    // -------------------------
+    // ECS (Fargate) + rede da VPC e integração com Dynamo se houver
+    // -------------------------
+    const ecsNodes = nodes.filter(n => n.type === 'ecs');
+    ecsNodes.forEach((n, i) => {
+      const ecsBase = `ecs_${i+1}`;
+
+      // VPC vizinha (ou cria dedicada)
+      const vpcNeighbor = neighbors(n.id)
+        .map(id => nodes.find(nn => nn.id === id))
+        .find(nn => nn?.type === 'vpc');
+      let vpcBase: string;
+      if (vpcNeighbor) {
+        vpcBase = vpcNameById.get(vpcNeighbor!.id)!;
+      } else {
+        vpcBase = `${ecsBase}_vpc`;
+        resources.push({ type: 'aws_vpc', name: vpcBase, properties: { cidr_block: '10.2.0.0/16' } });
+        resources.push({
+          type: 'aws_subnet',
+          name: `${vpcBase}_subnet`,
+          properties: { vpc_id: '${aws_vpc.' + vpcBase + '.id}', cidr_block: '10.2.1.0/24', map_public_ip_on_launch: true }
+        });
+        resources.push({ type: 'aws_security_group', name: `${vpcBase}_sg`, properties: {
+          name: `${vpcBase}-sg`, vpc_id: '${aws_vpc.' + vpcBase + '.id}'
+        }});
+      }
+
+      // Roles de execução da tarefa
+      dataBlocks.push({
+        type: 'aws_iam_policy_document',
+        name: `${ecsBase}_assume`,
+        properties: {},
+        blocks: [{ name: 'statement', body: {
+          actions: ['sts:AssumeRole'],
+          principals: { type: 'Service', identifiers: ['ecs-tasks.amazonaws.com'] }
+        }}]
+      });
+
+      resources.push({
+        type: 'aws_iam_role',
+        name: `${ecsBase}_exec_role`,
+        properties: {
+          name: `${ecsBase}-exec-role`,
+          assume_role_policy: '${data.aws_iam_policy_document.' + `${ecsBase}_assume` + '.json}'
+        }
+      });
+
+      // Task definition
+      const containerEnv: any[] = [];
+      // Se tiver Dynamo vizinho, cria env e policy
+      const dynNeighbor = neighbors(n.id)
+        .map(id => nodes.find(nn => nn.id === id))
+        .find(nn => nn?.type === 'dynamodb');
+
+      if (dynNeighbor) {
+        const dynIndex = dynamoNodes.findIndex(d => d.id === dynNeighbor!.id);
+        const dynRes = `dynamo_${dynIndex + 1}`;
+        containerEnv.push({ name: 'DYNAMO_TABLE', value: '${aws_dynamodb_table.' + dynRes + '.name}' });
+
+        resources.push({
+          type: 'aws_iam_role_policy',
+          name: `${ecsBase}_dynamo_policy`,
+          properties: {
+            name: `${ecsBase}-dynamo`,
+            role: '${aws_iam_role.' + `${ecsBase}_exec_role` + '.id}',
+            policy: JSON.stringify({
+              Version: '2012-10-17',
+              Statement: [{
+                Effect: 'Allow',
+                Action: ['dynamodb:GetItem','dynamodb:PutItem','dynamodb:Query','dynamodb:Scan','dynamodb:UpdateItem'],
+                Resource: ['*']
+              }]
+            })
+          }
+        });
+      }
+
+      resources.push({
+        type: 'aws_ecs_task_definition',
+        name: `${ecsBase}_task`,
+        properties: {
+          family: `${ecsBase}-family`,
+          requires_compatibilities: ['FARGATE'],
+          network_mode: 'awsvpc',
+          cpu: '256',
+          memory: '512',
+          execution_role_arn: '${aws_iam_role.' + `${ecsBase}_exec_role` + '.arn}',
+          container_definitions: JSON.stringify([{
+            name: `${ecsBase}-app`,
+            image: 'nginx:latest',
+            essential: true,
+            environment: containerEnv
+          }])
+        }
+      });
+
+      resources.push({
+        type: 'aws_ecs_cluster',
+        name: `${ecsBase}_cluster`,
+        properties: { name: `${ecsBase}-cluster` }
+      });
+
+      resources.push({
+        type: 'aws_ecs_service',
+        name: `${ecsBase}_svc`,
+        properties: {
+          name: `${ecsBase}-service`,
+          cluster: '${aws_ecs_cluster.' + `${ecsBase}_cluster` + '.id}',
+          task_definition: '${aws_ecs_task_definition.' + `${ecsBase}_task` + '.arn}',
+          desired_count: 1,
+          launch_type: 'FARGATE',
+          network_configuration: {
+            subnets: ['${aws_subnet.' + `${vpcBase}_subnet` + '.id}'],
+            security_groups: ['${aws_security_group.' + `${vpcBase}_sg` + '.id}'],
+            assign_public_ip: true
+          }
+        }
+      });
+    });
+
+    // -------------------------
+    // VPC ↔ DynamoDB => endpoint Gateway do Dynamo
+    // -------------------------
+    edges.forEach((e, idx) => {
+      const s = nodes.find(n => n.id === e.source);
+      const t = nodes.find(n => n.id === e.target);
+      if (!s || !t) return;
+      const pair = [s, t];
+
+      const vpc   = pair.find(n => n.type === 'vpc');
+      const dynamo = pair.find(n => n.type === 'dynamodb');
+      if (vpc && dynamo) {
+        const vpcBase = vpcNameById.get(vpc.id);
+        if (vpcBase) {
+          resources.push({
+            type: 'aws_vpc_endpoint',
+            name: `${vpcBase}_dynamodb_endpoint`,
+            properties: {
+              vpc_id: '${aws_vpc.' + vpcBase + '.id}',
+              service_name: 'com.amazonaws.sa-east-1.dynamodb',
+              vpc_endpoint_type: 'Gateway',
+              route_table_ids: ['${aws_route_table.' + `${vpcBase}_rt` + '.id}']
+            }
+          });
+        }
+      }
+    });    
   
     // -------------------------
     // DynamoDB tables (PROVISIONED + TTL + GSI + tags)
@@ -472,7 +778,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       const t = this.normalizeType(n.label);
       if (n.icon && !iconByType.has(t)) iconByType.set(t, n.icon);
     }
-
+  
     // 2) Limpa estado
     this.droppedServices = [];
     this.connections = [];
@@ -482,19 +788,23 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
     this.serviceDeleteMode = false;
     this.lineStyle = null;
     this.portDraft = { from: null };
-
+  
     const resources = Array.isArray(config?.resources) ? config.resources : [];
-
-    // DynamoDB -> nós
+  
+    // -------------------------
+    // Glue + Dynamo (seu comportamento atual)
+    // -------------------------
+  
+    // DynamoDB -> nós (um nó por tabela)
     const dynamoRes = resources.filter((r: any) => r.type === 'aws_dynamodb_table');
     const dynIndexByName = new Map<string, number>();
-
+  
     // cria 1 nó Glue se houver algo de Glue
     const hasGlue =
       resources.some((r: any) => r.type === 'aws_glue_crawler') ||
       resources.some((r: any) => r.type === 'aws_glue_catalog_database') ||
       resources.some((r: any) => r.type === 'aws_iam_role');
-
+  
     let glueIndex: number | null = null;
     if (hasGlue) {
       this.droppedServices.push({
@@ -505,12 +815,12 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       });
       glueIndex = 0;
     }
-
-    // posiciona os Dynamo à direita do Glue
+  
+    // posiciona os Dynamo à direita do Glue (ou iniciais)
     const startX = hasGlue ? 460 : 200;
     let dx = startX;
     const y = 200;
-
+  
     dynamoRes.forEach((r: any) => {
       const nodeLabel = 'Dynamo';
       this.droppedServices.push({
@@ -523,7 +833,7 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
       dynIndexByName.set(r.name, idx);
       dx += 220;
     });
-
+  
     // Conexões: cada glue crawler com dynamodb_target -> link
     const crawlers = resources.filter((r: any) => r.type === 'aws_glue_crawler');
     for (const c of crawlers) {
@@ -542,7 +852,239 @@ export class CanvasComponent implements AfterViewInit, OnDestroy {
         });
       }
     }
-
+  
+    // -------------------------
+    // RECONSTRUÇÃO EXTRA: VPC/EC2/ECS/Dynamo + ligações
+    // -------------------------
+    try {
+      const byType = (t: string) => resources.filter((r: any) => r.type === t);
+  
+      // Helpers de aresta (evita duplicatas)
+      const edgeKey = (a: number, b: number) => `${Math.min(a,b)}->${Math.max(a,b)}`;
+      const existingEdges = new Set<string>();
+      const link = (srcIdx: number, dstIdx: number, style: 'solid'|'dashed'='solid') => {
+        const k = edgeKey(srcIdx, dstIdx);
+        if (existingEdges.has(k)) return;
+        this.portConnections.push({
+          source: { nodeIndex: srcIdx, side: 'right' },
+          target: { nodeIndex: dstIdx, side: 'left' },
+          style
+        });
+        existingEdges.add(k);
+      };
+  
+      // Layout simples para novos nós (fora dos já criados p/ Glue/Dynamo)
+      const grid = { col: 0 };
+      const nextPos = () => {
+        const x = 60 + (grid.col % 4) * 220;
+        const y = 80 + Math.floor(grid.col / 4) * 200;
+        grid.col++;
+        return { x, y };
+      };
+  
+      // Indexadores de nós criados aqui
+      const vpcIdxByBase = new Map<string, number>(); // base = nome do recurso aws_vpc.<name>
+      const ec2IdxByName = new Map<string, number>(); // name = aws_instance.<name>
+      const ecsIdxByBase = new Map<string, number>(); // base ~ ecs_N
+  
+      const ensureVpcNode = (base: string) => {
+        if (vpcIdxByBase.has(base)) return vpcIdxByBase.get(base)!;
+        const pos = nextPos();
+        this.droppedServices.push({
+          label: 'VPC',
+          icon: iconByType.get('vpc') ?? this.defaultIconFor('vpc'),
+          x: pos.x,
+          y: pos.y
+        });
+        const idx = this.droppedServices.length - 1;
+        vpcIdxByBase.set(base, idx);
+        return idx;
+      };
+  
+      const ensureEc2Node = (name: string) => {
+        if (ec2IdxByName.has(name)) return ec2IdxByName.get(name)!;
+        const pos = nextPos();
+        this.droppedServices.push({
+          label: 'EC2',
+          icon: iconByType.get('ec2') ?? this.defaultIconFor('ec2'),
+          x: pos.x,
+          y: pos.y
+        });
+        const idx = this.droppedServices.length - 1;
+        ec2IdxByName.set(name, idx);
+        return idx;
+      };
+  
+      const ensureEcsNode = (base: string) => {
+        if (ecsIdxByBase.has(base)) return ecsIdxByBase.get(base)!;
+        const pos = nextPos();
+        this.droppedServices.push({
+          label: 'ECS',
+          icon: iconByType.get('ecs') ?? this.defaultIconFor('ecs'),
+          x: pos.x,
+          y: pos.y
+        });
+        const idx = this.droppedServices.length - 1;
+        ecsIdxByBase.set(base, idx);
+        return idx;
+      };
+  
+      // Subnets -> base da VPC (assumindo padrão "<base>_subnet")
+      const subnetBaseByName = new Map<string, string>(); // "vpc_1_subnet" -> "vpc_1"
+      byType('aws_subnet').forEach((r: any) => {
+        const m = /^(.+)_subnet$/.exec(r.name);
+        if (m) subnetBaseByName.set(r.name, m[1]);
+      });
+  
+      // Pré-cria nós de VPC existentes (mantém um por recurso)
+      byType('aws_vpc').forEach((r: any) => {
+        ensureVpcNode(r.name);
+      });
+  
+      // -------------------------
+      // EC2 ↔ VPC (via subnet_id)
+      // -------------------------
+      byType('aws_instance').forEach((inst: any) => {
+        const ec2Idx = ensureEc2Node(inst.name);
+        const subnetRef: string | undefined = inst?.properties?.subnet_id;
+        const m = /\${aws_subnet\.([^}]+)\.id}/.exec(subnetRef || '');
+        if (m) {
+          const subnetName = m[1]; // ex: vpc_1_subnet
+          const vpcBase = subnetBaseByName.get(subnetName);
+          if (vpcBase) {
+            const vpcIdx = ensureVpcNode(vpcBase);
+            link(vpcIdx, ec2Idx, 'solid');
+          }
+        }
+      });
+  
+      // -------------------------
+      // ECS ↔ VPC (via service.network_configuration.subnets)
+      // -------------------------
+      const ecsBaseFrom = (name: string) => name.replace(/_(cluster|svc|task)$/, '');
+  
+      byType('aws_ecs_service').forEach((svc: any) => {
+        const base = ecsBaseFrom(svc.name);
+        const ecsIdx = ensureEcsNode(base);
+  
+        const net = svc?.properties?.network_configuration;
+        const subnets = Array.isArray(net?.subnets) ? net.subnets : [];
+        const firstRef = subnets.find((s: string) => typeof s === 'string' && s.includes('${aws_subnet.'));
+        if (firstRef) {
+          const m = /\${aws_subnet\.([^}]+)\.id}/.exec(firstRef);
+          if (m) {
+            const subnetName = m[1];
+            const vpcBase = subnetBaseByName.get(subnetName);
+            if (vpcBase) {
+              const vpcIdx = ensureVpcNode(vpcBase);
+              link(vpcIdx, ecsIdx, 'solid');
+            }
+          }
+        }
+      });
+  
+      // -------------------------
+      // ECS ↔ DynamoDB (via env DYNAMO_TABLE da Task Definition)
+      // -------------------------
+      const taskByName = new Map<string, any>();
+      byType('aws_ecs_task_definition').forEach((t: any) => taskByName.set(t.name, t));
+  
+      const ecsTaskByBase = new Map<string, any>();
+      for (const [name, td] of taskByName.entries()) {
+        const base = ecsBaseFrom(name);
+        ecsTaskByBase.set(base, td);
+      }
+  
+      ecsTaskByBase.forEach((td: any, base: string) => {
+        // container_definitions é string JSON
+        let containers: any[] = [];
+        try {
+          const raw = td?.properties?.container_definitions;
+          if (typeof raw === 'string') containers = JSON.parse(raw);
+        } catch { /* ignora json inválido */ }
+  
+        const envs = containers.flatMap(c => Array.isArray(c?.environment) ? c.environment : []);
+        // procura env referenciando ${aws_dynamodb_table.<name>.name}
+        const dynRef = envs
+          .map((e: any) => e?.value)
+          .find((v: any) => typeof v === 'string' && /\${aws_dynamodb_table\.([A-Za-z0-9_\-]+)\.name}/.test(v));
+  
+        if (dynRef) {
+          const m = /\${aws_dynamodb_table\.([A-Za-z0-9_\-]+)\.name}/.exec(dynRef);
+          if (m) {
+            const dynName = m[1];
+            const dynIdx = dynIndexByName.get(dynName);
+            if (dynIdx !== undefined) {
+              const ecsIdx = ensureEcsNode(base);
+              link(ecsIdx, dynIdx, 'solid');
+            }
+          }
+        }
+      });
+  
+      // -------------------------
+      // EC2 ↔ DynamoDB (heurística: quando há UMA única tabela e policy Dynamo associada)
+      // -------------------------
+      if (dynamoRes.length === 1) {
+        const onlyDynName = dynamoRes[0]?.name;
+        const onlyDynIdx = onlyDynName ? dynIndexByName.get(onlyDynName) : undefined;
+  
+        if (onlyDynIdx !== undefined) {
+          const policies = byType('aws_iam_role_policy');
+  
+          const isDynamoPolicy = (pjson: any) => {
+            try {
+              const pol = typeof pjson === 'string' ? JSON.parse(pjson) : pjson;
+              const stmts = Array.isArray(pol?.Statement) ? pol.Statement : [];
+              return stmts.some((s: any) => {
+                const acts = Array.isArray(s?.Action) ? s.Action : [s?.Action].filter(Boolean);
+                return acts.some((a: string) => typeof a === 'string' && a.toLowerCase().startsWith('dynamodb:'));
+              });
+            } catch { return false; }
+          };
+  
+          policies.forEach((p: any) => {
+            if (!isDynamoPolicy(p?.properties?.policy)) return;
+  
+            // Nome no padrão do export: ec2_X_dynamo_policy
+            const name: string = p.name || '';
+            const m = /(ec2_[0-9]+)_/.exec(name);
+            if (!m) return;
+  
+            const ec2Name = m[1]; // ex: ec2_1
+            const ec2Idx = ensureEc2Node(ec2Name);
+            link(ec2Idx, onlyDynIdx, 'solid');
+          });
+        }
+      }
+  
+      // -------------------------
+      // VPC ↔ DynamoDB (via aws_vpc_endpoint de serviço Dynamo) — liga só se houver 1 tabela
+      // -------------------------
+      if (dynamoRes.length === 1) {
+        const onlyDynName = dynamoRes[0]?.name;
+        const onlyDynIdx = onlyDynName ? dynIndexByName.get(onlyDynName) : undefined;
+  
+        if (onlyDynIdx !== undefined) {
+          byType('aws_vpc_endpoint').forEach((ep: any) => {
+            const svcName = (ep?.properties?.service_name || '').toString();
+            if (!/dynamodb/i.test(svcName)) return;
+  
+            const vpcRef: string | undefined = ep?.properties?.vpc_id;
+            const m = /\${aws_vpc\.([^}]+)\.id}/.exec(vpcRef || '');
+            if (m) {
+              const vpcBase = m[1];
+              const vpcIdx = ensureVpcNode(vpcBase);
+              link(vpcIdx, onlyDynIdx, 'dashed'); // dashed para diferenciar "endpoint"
+            }
+          });
+        }
+      }
+    } catch {
+      // reconstrução opcional: não bloqueia o load caso algo mude no HCL
+    }
+  
+    // Por fim, notifica o grafo
     this.emitGraph();
   }
   /** Fallback de ícone por tipo – ajuste os paths se forem diferentes no seu projeto. */
