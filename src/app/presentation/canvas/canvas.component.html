@@ -14,27 +14,27 @@
     <i class="fas fa-expand"></i>
   </button>
 
-  <!-- Estilo de linha -->
-  <button class="icon-btn" (click)="toggleDashedMode()" [class.active]="lineStyle === 'dashed'" title="Linha tracejada">
-    <i class="fas fa-ellipsis-h"></i>
-  </button>
-  <button class="icon-btn" (click)="toggleSolidMode()" [class.active]="lineStyle === 'solid'" title="Linha sólida">
+  <!-- Estilo linha -->
+  <button class="icon-btn" (click)="toggleSolidMode()" [class.active]="lineStyle==='solid'" title="Linha contínua">
     <i class="fas fa-minus"></i>
   </button>
-
-  <!-- Modos de exclusão -->
-  <button class="icon-btn" (click)="toggleDeleteMode()" [class.active]="deleteMode" title="Excluir ligação">
-    <i class="fas fa-eraser"></i>
+  <button class="icon-btn" (click)="toggleDashedMode()" [class.active]="lineStyle==='dashed'" title="Linha tracejada">
+    <i class="fas fa-ellipsis-h"></i>
   </button>
-  <button class="icon-btn" (click)="toggleServiceDeleteMode()" [class.active]="serviceDeleteMode" title="Excluir serviço">
+
+  <!-- Remoções -->
+  <button class="icon-btn" (click)="toggleDeleteMode()" [class.active]="deleteMode" title="Apagar ligação">
+    <i class="fas fa-cut"></i>
+  </button>
+  <button class="icon-btn" (click)="toggleServiceDeleteMode()" [class.active]="serviceDeleteMode" title="Apagar serviço">
     <i class="fas fa-trash"></i>
   </button>
+</div>
 
-<!-- CANVAS -->
+<!-- CANVAS raiz -->
 <div
   #canvasRef
   class="canvas"
-  [class.linking]="!!linkingFrom"
   cdkDropList
   id="canvas-drop"
   [cdkDropListConnectedTo]="['palette-drop']"
@@ -43,41 +43,61 @@
   (pointerdown)="onPointerDown($event)"
   (pointermove)="onPointerMove($event)"
   (pointerup)="onPointerUp($event)"
+  [class.service-delete-mode]="serviceDeleteMode"
 >
-  <div #viewportRef class="viewport" [style.transform]="transform" [style.transformOrigin]="transformOrigin">
-    <svg class="connections">
-      <!-- ligações reais (cada uma respeita o seu estilo salvo) -->
-      <ng-container *ngFor="let pc of portConnections; let j = index">
-        <line
-          class="hit-area" (click)="onPortLineClick(j)"
-          [attr.x1]="getPortXY(pc.source).x" [attr.y1]="getPortXY(pc.source).y"
-          [attr.x2]="getPortXY(pc.target).x" [attr.y2]="getPortXY(pc.target).y"
-        ></line>
-        <line
-          class="visible-line" [ngClass]="pc.style"
-          [attr.x1]="getPortXY(pc.source).x" [attr.y1]="getPortXY(pc.source).y"
-          [attr.x2]="getPortXY(pc.target).x" [attr.y2]="getPortXY(pc.target).y"
-        ></line>
-      </ng-container>
+  <!-- grade / fundo -->
+  <div class="grid"></div>
 
-      <!-- preview do link (usa o estilo selecionado no menu) -->
-      <line
-        *ngIf="linkingFrom"
-        class="visible-line preview"
-        [ngClass]="lineStyle"
-        [attr.x1]="getPortXY(linkingFrom!).x"
-        [attr.y1]="getPortXY(linkingFrom!).y"
-        [attr.x2]="mouseWorldX"
-        [attr.y2]="mouseWorldY"
-      ></line>
+  <!-- viewport que recebe pan/zoom -->
+  <div #viewportRef class="viewport" [style.transform]="transform" [style.transform-origin]="transformOrigin">
+
+    <!-- linhas -->
+    <svg class="connections">
+      <g *ngFor="let conn of portConnections; let i = index" (click)="onPortLineClick(i)">
+        <path class="hit-area"
+              [attr.d]="'M ' + getPortXY(conn.source).x + ' ' + getPortXY(conn.source).y + ' L ' + getPortXY(conn.target).x + ' ' + getPortXY(conn.target).y">
+        </path>
+        <path class="visible-line"
+              [ngClass]="conn.style"
+              [attr.d]="'M ' + getPortXY(conn.source).x + ' ' + getPortXY(conn.source).y + ' L ' + getPortXY(conn.target).x + ' ' + getPortXY(conn.target).y">
+        </path>
+      </g>
     </svg>
 
-    <!-- NODES -->
+    <!-- VPCs (atrás dos nós) -->
+    <div
+      class="vpc"
+      *ngFor="let v of vpcs; let vi = index"
+      [style.left.px]="v.x - 0"
+      [style.top.px]="v.y - 0"
+      [style.width.px]="v.w"
+      [style.height.px]="v.h"
+    >
+      <div class="vpc-titlebar" (mousedown)="startVpcDrag(vi, $event)">
+        <i class="fas fa-network-wired"></i>
+        <span class="label">{{ v.label }}</span>
+      </div>
+
+      <!-- resize handles -->
+      <div class="vpc-handle n"  (mousedown)="startVpcResize(vi, 'n', $event)"></div>
+      <div class="vpc-handle s"  (mousedown)="startVpcResize(vi, 's', $event)"></div>
+      <div class="vpc-handle e"  (mousedown)="startVpcResize(vi, 'e', $event)"></div>
+      <div class="vpc-handle w"  (mousedown)="startVpcResize(vi, 'w', $event)"></div>
+      <div class="vpc-handle ne" (mousedown)="startVpcResize(vi, 'ne', $event)"></div>
+      <div class="vpc-handle nw" (mousedown)="startVpcResize(vi, 'nw', $event)"></div>
+      <div class="vpc-handle se" (mousedown)="startVpcResize(vi, 'se', $event)"></div>
+      <div class="vpc-handle sw" (mousedown)="startVpcResize(vi, 'sw', $event)"></div>
+    </div>
+
+    <!-- Serviços (nós) -->
     <div
       class="node"
       *ngFor="let s of droppedServices; let i = index"
-      [style.left.px]="s.x"
-      [style.top.px]="s.y"
+      [class.in-vpc]="$any(s).parentId"
+      [style.left.px]="s.x - NODE_W/2"
+      [style.top.px]="s.y - NODE_H/2"
+      [style.width.px]="NODE_W"
+      [style.height.px]="NODE_H"
       (mousedown)="startNodeDrag(i, $event)"
       (click)="onServiceClick(i, $event)"
     >

@@ -3,11 +3,10 @@
 .icon-btn-img { width: 24px; height: 24px; opacity: 0.6; }
 .icon-btn.active .icon-btn-img, .icon-btn:hover .icon-btn-img { opacity: 1; }
 
-/* Canvas fixo; pan/zoom ocorrem na .viewport */
 .canvas {
   position: relative;
   width: 100%;
-  min-height: 100vh; /* fundo infinito */
+  min-height: 100vh;
   overflow: hidden;
   cursor: crosshair;
   background:
@@ -15,112 +14,121 @@
     radial-gradient(#d8d8d8 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: 0 0, 10px 10px;
-  background-color: #f7f7f9;
 }
 
-/* “Tapete” grande para trabalhar longe sem limite */
+.grid { position: absolute; inset: 0; pointer-events: none; }
+
 .viewport {
-  position: absolute;
-  inset: 0;
-  will-change: transform;
+  position: relative;
   min-width: 8000px;
   min-height: 8000px;
-  background: transparent;
+  transform-origin: 0 0;
 }
 
-/* Linhas */
-.connections { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
-.hit-area { stroke: transparent; stroke-width: 12px; pointer-events: stroke; cursor: pointer; }
-.visible-line { stroke: #0f1a2a; stroke-width: 2.4px; pointer-events: none; }
-.visible-line.solid { stroke-dasharray: none; }
+/* Conexões */
+.connections {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 3; /* acima da VPC (2), abaixo dos nós (4) */
+}
+.hit-area { stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
+.visible-line { stroke: #2b6fff; stroke-width: 2px; fill: none; }
+.visible-line.solid { stroke-dasharray: 0; }
 .visible-line.dashed { stroke-dasharray: 6 6; }
-.visible-line.preview { stroke: #2b6fff; stroke-width: 2px; stroke-dasharray: 6 6; }
 
-/* Nodes */
+/* VPC: deixar cliques atravessarem, mas titlebar/handles clicáveis */
+/* VPC: deixar cliques atravessarem, mas titlebar/handles clicáveis */
+.vpc {
+  position: absolute;
+  z-index: 2;
+  background: rgba(120, 60, 160, 0.10); /* roxo translúcido */
+  border: 2px solid rgba(180, 130, 220, 0.45);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(60, 20, 90, 0.5), 0 4px 14px rgba(0,0,0,0.20);
+  pointer-events: none; /* cliques passam pro SVG das conexões */
+}
+
+.vpc-titlebar,
+.vpc-handle {
+  pointer-events: auto; /* ainda dá pra arrastar e redimensionar */
+}
+
+/* Titlebar mais bonita, discreta */
+.vpc-titlebar {
+  height: 34px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 0 12px;
+  background: linear-gradient(180deg, rgba(100, 50, 140, 0.75), rgba(70, 30, 110, 0.85));
+  color: #f0e8f8; /* texto claro */
+  border-top-left-radius: 14px;
+  border-top-right-radius: 14px;
+  cursor: move;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+}
+
+/* Label em pill discreto */
+.vpc .label {
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+
+/* VPC handles */
+.vpc-handle {
+  position: absolute; width: 12px; height: 12px; background: #2b6fff;
+  border: 2px solid #ffffff; border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  cursor: pointer;
+  opacity: .9;
+}
+.vpc-handle.n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.vpc-handle.s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.vpc-handle.e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.vpc-handle.w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.vpc-handle.ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.vpc-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.vpc-handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.vpc-handle.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+
+/* Node */
 .node {
   position: absolute;
-  width: 108px;
-  height: 96px;
-  transform: translate(-50%, -50%); /* ancora no centro */
-  display: flex; flex-direction: column; align-items: center;
-  padding: 8px 12px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 8px 24px rgba(39,48,77,.10);
-  border: 1px solid #e9e9ef;
-  user-select: none;
-  cursor: grab;
-  z-index: 2;
+  z-index: 4; /* acima das linhas */
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+  cursor: move;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px;
 }
-.node:active { cursor: grabbing; }
-.node-icon { width: 44px; height: 44px; object-fit: contain; margin-top: 6px; }
-.node-label { margin-top: 6px; font-weight: 700; font-size: 13px; color: #0f172a; text-align: center; }
+.node.in-vpc { box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
 
-/* === Portas: clicáveis e bonitas === */
+.node-icon { width: 46px; height: 46px; object-fit: contain; pointer-events: none; }
+.node-label { font-size: 12px; text-align: center; line-height: 1.1; color: #1a1f2e; padding: 0 6px; }
+
+/* Ports */
 .port {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 9999px;           /* 100% circular */
-  background: #fff;                /* miolo branco */
-  border: 2px solid #2b6fff;       /* aro azul */
-  box-shadow:
-    0 2px 6px rgba(22, 36, 72, .12),    /* sombra suave */
-    0 0 0 3px rgba(43, 111, 255, .12);  /* glow externo leve */
-  opacity: 0;
-  pointer-events: none;            /* habilito nas regras abaixo */
-  transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease, opacity .12s ease;
-  z-index: 10;                     /* acima de linhas/SVG */
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #ffffff; background: #2b6fff; opacity: .9;
 }
+.port.top    { top: -7px; left: 50%; transform: translate(-50%, 0); }
+.port.right  { right: -7px; top: 50%; transform: translate(0, -50%); }
+.port.bottom { bottom: -7px; left: 50%; transform: translate(-50%, 0); }
+.port.left   { left: -7px; top: 50%; transform: translate(0, -50%); }
 
-/* miolinho azul */
-.port::after {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border-radius: inherit;
-  background: #2b6fff;
-}
-
-/* HIT-AREA invisível ampliada (28x28) – facilita o clique mesmo no zoom-out */
-.port::before {
-  content: "";
-  position: absolute;
-  left: 50%; top: 50%;
-  width: 28px; height: 28px;
-  transform: translate(-50%, -50%);
-  border-radius: 9999px;
-  background: transparent;
-  pointer-events: auto; /* captura clique */
-}
-
-/* mostrar e habilitar clique:
-   - ao passar o mouse no node
-   - quando está ligando (canvas.linking)
-   - quando forçado por .show-ports */
-.node:hover .port,
-.canvas.linking .port,
-.canvas.show-ports .port {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Hover/press com hit-area grande */
-.port:hover,
-.port:focus-visible {
-  transform: scale(1.18);
-  box-shadow:
-    0 4px 14px rgba(22, 36, 72, .18),
-    0 0 0 5px rgba(43, 111, 255, .22);
-  background: #f6f9ff;
-}
-.port:active { transform: scale(1.08); background: #eaf1ff; }
-
-/* Posicionamento (12px + 2px borda = 16px) */
-.port.top    { top: -8px;    left: 50%; transform: translate(-50%, -50%); }
-.port.right  { right: -8px;  top: 50%;  transform: translate(50%, -50%);  }
-.port.bottom { bottom: -8px; left: 50%; transform: translate(-50%, 50%);  }
-.port.left   { left: -8px;   top: 50%;  transform: translate(-50%, -50%); }
+.port:hover { filter: brightness(1.05); }
 
 /* Modos */
 .canvas.service-delete-mode { cursor: pointer; }
@@ -130,9 +138,9 @@
   color: #000000;
   transition: opacity .2s;
 }
-
 .icon-btn.active i,
 .icon-btn:hover i {
   opacity: 1;
-  color: #2b6fff; /* azul no hover/ativo */
+  color: #2b6fff;
 }
+
