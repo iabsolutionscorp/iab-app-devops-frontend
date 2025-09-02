@@ -48,6 +48,8 @@
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
+
+  z-index: 2;
 }
 
 .hit-area {
@@ -248,6 +250,9 @@
   border-top-right-radius: 10px;
   font-weight: 700;
   color: #0f172a;
+
+  position: relative;
+  z-index: 5;
 }
 
 .vpc-icon { width: 20px; height: 20px; object-fit: contain; }
@@ -278,7 +283,10 @@
 .vpc-body { pointer-events: none; }
 
 /* Header arrastável */
-.vpc-header { cursor: move; user-select: none; }
+.vpc-header { cursor: move; user-select: none; 
+  position: relative;
+  z-index: 5;
+}
 
 /* Handle de redimensionamento (canto inferior direito) */
 .vpc-resize {
@@ -291,6 +299,8 @@
   border-bottom: 2px solid rgba(15, 23, 42, .45);
   cursor: se-resize;
   pointer-events: auto;
+
+  z-index: 5;
 }
 
 
@@ -316,9 +326,53 @@
 }
 
 
-/* ===== Camadas (z-index): VPC sempre atrás dos serviços ===== */
-.canvas .vpc-container { z-index: 1; }
-.canvas .node         { z-index: 2; }
+/* ===== Camadas =====
+   - vpc-body atrás
+   - connections (linhas) no meio
+   - nodes na frente
+   - vpc-header e vpc-resize acima de tudo p/ arrastar/redimensionar
+*/
 
-/* (Opcional) traz o nó um pouco mais à frente enquanto arrasta */
-.canvas .node.dragging { z-index: 3; }
+/* Remova QUALQUER z-index da vpc-container para NÃO criar stacking context */
+.canvas .vpc-container {
+  position: absolute; /* ou relative, conforme já estiver */
+  /* z-index: 1;  <-- REMOVER se existir */
+}
+
+/* O “papel” da VPC fica atrás e não intercepta clique (linhas passam por cima) */
+.vpc-body {
+  position: relative;
+  z-index: 1;
+  pointer-events: none; /* não bloqueia cliques nas linhas ou nos serviços */
+}
+
+/* SVG das conexões por cima do papel da VPC */
+.connections {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 10;         /* acima do vpc-body */
+  /* NÃO usar pointer-events:none aqui, para permitir selecionar/editar linhas */
+}
+
+/* Serviços sempre acima das linhas */
+.canvas .node {
+  position: absolute;  /* garantir posicionamento */
+  z-index: 20;
+}
+.canvas .node.dragging {
+  z-index: 40;         /* durante drag, fica no topo */
+}
+
+/* Header e handle de resize da VPC acima das linhas (e com clique ativo) */
+.vpc-header {
+  position: relative;
+  z-index: 30;         /* acima das connections */
+  pointer-events: auto;
+}
+
+.vpc-resize {
+  position: absolute;  /* normalmente já é absolute */
+  z-index: 30;         /* acima das connections */
+  pointer-events: auto;
+}
