@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 
 import { TerraformGeneratorService } from '../../infra/services/terraform-generator.service'; // MAIN
-import { TerraformHclParserService } from '../../services/terraform-hcl-parser.service';       // MESCLA
+import { TerraformHclParserService } from '../../services/terraform-hcl-parser.service';
+import { LocalstackNormalizerService } from '../../services/localstack-normalizer.service';       // MESCLA
 
 @Component({
   selector: 'app-terraform-preview',
@@ -24,7 +25,7 @@ export class TerraformPreviewComponent implements OnInit, OnChanges, OnDestroy {
   private input$ = new Subject<string>();
   private sub?: Subscription;
 
-  constructor(
+  constructor(private localstack: LocalstackNormalizerService, 
     private gen: TerraformGeneratorService,
     private parser: TerraformHclParserService
   ) {}
@@ -54,6 +55,7 @@ export class TerraformPreviewComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onEditorChange(value: string) {
+    value = this.localstack.ensure(value);
     this.input$.next(value ?? '');
   }
 

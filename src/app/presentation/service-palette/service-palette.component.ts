@@ -16,6 +16,7 @@ export class ServicePaletteComponent {
     { label: 'ECS',    icon: '/icons/ecs.png'    },
     { label: 'VPC',    icon: '/icons/vpc.png'    },
     { label: 'Glue',   icon: '/icons/glue.png'   },
+    { label: 'S3',     icon: '/icons/s3.png'     },
   ];
 
   onPaletteDrop(event: CdkDragDrop<any>) {

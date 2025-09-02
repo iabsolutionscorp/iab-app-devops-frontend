@@ -1,146 +1,324 @@
-.controls { margin-bottom: 8px; }
-.icon-btn { border: none; background: none; padding: 6px; cursor: pointer; margin-right: 8px; }
-.icon-btn-img { width: 24px; height: 24px; opacity: 0.6; }
-.icon-btn.active .icon-btn-img, .icon-btn:hover .icon-btn-img { opacity: 1; }
+.canvas-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 
+.controls {
+  margin-bottom: 8px;
+}
+
+.icon-btn {
+  border: none;
+  background: none;
+  padding: 6px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.icon-btn-img {
+  width: 24px;
+  height: 24px;
+  opacity: 0.6;
+}
+
+.icon-btn.active .icon-btn-img {
+  opacity: 1;
+}
+
+/* área do canvas com grid pontilhado */
 .canvas {
   position: relative;
-  width: 100%;
-  min-height: 100vh;
+  flex: 1;
+  padding: 1rem;
+  box-sizing: border-box;
   overflow: hidden;
   cursor: crosshair;
-  background:
-    radial-gradient(#d8d8d8 1px, transparent 1px),
-    radial-gradient(#d8d8d8 1px, transparent 1px);
+  background-color: #f5f5f5;
+  background-image: radial-gradient(#ccc 1px, transparent 1px);
   background-size: 20px 20px;
-  background-position: 0 0, 10px 10px;
 }
 
-.grid { position: absolute; inset: 0; pointer-events: none; }
-
-.viewport {
-  position: relative;
-  min-width: 8000px;
-  min-height: 8000px;
-  transform-origin: 0 0;
-}
-
-/* Conexões */
-.connections {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none;
-  z-index: 3; /* acima da VPC (2), abaixo dos nós (4) */
-}
-.hit-area { stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
-.visible-line { stroke: #2b6fff; stroke-width: 2px; fill: none; }
-.visible-line.solid { stroke-dasharray: 0; }
-.visible-line.dashed { stroke-dasharray: 6 6; }
-
-/* VPC: deixar cliques atravessarem, mas titlebar/handles clicáveis */
-/* VPC: deixar cliques atravessarem, mas titlebar/handles clicáveis */
-.vpc {
-  position: absolute;
-  z-index: 2;
-  background: rgba(120, 60, 160, 0.10); /* roxo translúcido */
-  border: 2px solid rgba(180, 130, 220, 0.45);
-  border-radius: 16px;
-  box-shadow: inset 0 0 0 1px rgba(60, 20, 90, 0.5), 0 4px 14px rgba(0,0,0,0.20);
-  pointer-events: none; /* cliques passam pro SVG das conexões */
-}
-
-.vpc-titlebar,
-.vpc-handle {
-  pointer-events: auto; /* ainda dá pra arrastar e redimensionar */
-}
-
-/* Titlebar mais bonita, discreta */
-.vpc-titlebar {
-  height: 34px;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 0 12px;
-  background: linear-gradient(180deg, rgba(100, 50, 140, 0.75), rgba(70, 30, 110, 0.85));
-  color: #f0e8f8; /* texto claro */
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
-  cursor: move;
-  user-select: none;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
-}
-
-/* Label em pill discreto */
-.vpc .label {
-  font-weight: 600;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
-}
-
-
-/* VPC handles */
-.vpc-handle {
-  position: absolute; width: 12px; height: 12px; background: #2b6fff;
-  border: 2px solid #ffffff; border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+.canvas.service-delete-mode {
+  /* opcional: muda cursor para mostrar modo excluir */
   cursor: pointer;
-  opacity: .9;
 }
-.vpc-handle.n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
-.vpc-handle.s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
-.vpc-handle.e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-.vpc-handle.w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-.vpc-handle.ne { right: -6px; top: -6px; cursor: nesw-resize; }
-.vpc-handle.nw { left: -6px; top: -6px; cursor: nwse-resize; }
-.vpc-handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
-.vpc-handle.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
 
-/* Node */
+.connections {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
+.hit-area {
+  stroke: transparent;
+  stroke-width: 12px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.visible-line {
+  stroke: black;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+
+.visible-line.dashed {
+  stroke-dasharray: 4 4;
+}
+
+.visible-line.solid {
+  stroke-dasharray: none;
+}
+
 .node {
   position: absolute;
-  z-index: 4; /* acima das linhas */
-  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
   background: #ffffff;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  border: 1px solid rgba(0,0,0,0.06);
-  cursor: move;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.node:active {
+  cursor: grabbing;
+}
+
+.node-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+}
+
+.node-label {
+  font-size: 13px;
+  text-align: center;
+}
+/* ===== Portas dos nós ===== */
+.port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid #1c2533;
+  background: #fff;
+  cursor: crosshair;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  transition: transform .08s ease;
+}
+.port:hover { transform: scale(1.15); }
+
+.port.top    { top: -6px; left: 50%; transform: translate(-50%, -50%); }
+.port.right  { right: -6px; top: 50%; transform: translate(50%, -50%); }
+.port.bottom { bottom: -6px; left: 50%; transform: translate(-50%, 50%); }
+.port.left   { left: -6px; top: 50%; transform: translate(-50%, -50%); }
+
+/* Ports menores, circulares e azuis */
+.node .port {
+  --port-size: 6px;                 /* ajuste aqui o tamanho */
+  --port-offset: calc(var(--port-size) / 2);
+
+  position: absolute;
+  width: var(--port-size);
+  height: var(--port-size);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #2b6fff;         /* azul */
+  outline: none;
+  padding: 0;
+  cursor: crosshair;
+  -webkit-appearance: none;
+  appearance: none;
+
+  /* anel externo sutil (tipo o que já tinha no visual) */
+  box-shadow: 0 0 0 1.5px #0f1a2a;
+}
+
+.node .port:hover {
+  box-shadow: 0 0 0 3px rgba(43,111,255,.25), 0 0 0 2px #0f1a2a;
+}
+
+.node .port:active { background: #2b6fff20; }
+
+/* posicionamento nas 4 bordas */
+.node .port.top {
+  top: calc(-1 * var(--port-offset));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node .port.right {
+  right: calc(-1 * var(--port-offset));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node .port.bottom {
+  bottom: calc(-1 * var(--port-offset));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node .port.left {
+  left: calc(-1 * var(--port-offset));
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Ports escondidas por padrão */
+.node .port {
+  opacity: 0;
+  pointer-events: none;           /* não clicáveis enquanto escondidas */
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+/* Mostra as ports quando o mouse entra no card */
+.node:hover .port {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mostra todas as ports enquanto está conectando */
+.canvas.show-ports .port {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.node { will-change: left, top; }
+
+.node-label {
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  margin-top: 6px;
+  color: #0f172a; /* ajuste se preferir outra cor */
+}
+/* === Node compacto === */
+.node {
+  width: 108px;      /* antes 132px */
+  height: 96px;      /* antes 116px */
+  padding: 10px 8px; 
   gap: 6px;
 }
-.node.in-vpc { box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
 
-.node-icon { width: 46px; height: 46px; object-fit: contain; pointer-events: none; }
-.node-label { font-size: 12px; text-align: center; line-height: 1.1; color: #1a1f2e; padding: 0 6px; }
-
-/* Ports */
-.port {
-  position: absolute; width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid #ffffff; background: #2b6fff; opacity: .9;
+.node-icon {
+  width: 44px;       /* antes 56px */
+  height: 44px;
+  object-fit: contain;
 }
-.port.top    { top: -7px; left: 50%; transform: translate(-50%, 0); }
-.port.right  { right: -7px; top: 50%; transform: translate(0, -50%); }
-.port.bottom { bottom: -7px; left: 50%; transform: translate(-50%, 0); }
-.port.left   { left: -7px; top: 50%; transform: translate(0, -50%); }
 
-.port:hover { filter: brightness(1.05); }
-
-/* Modos */
-.canvas.service-delete-mode { cursor: pointer; }
-
-.icon-btn i {
-  font-size: 26px;
-  color: #000000;
-  transition: opacity .2s;
+.node-label {
+  font-size: 13px;   /* antes 14px */
+  line-height: 1.05;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.icon-btn.active i,
-.icon-btn:hover i {
+
+
+/* ===== VPC como janela/contêiner ===== */
+.vpc-container {
+  position: absolute;
+  left: 0; top: 0;
+  background: #f9fbff;
+  border: 2px dashed #94a3b8;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(148,163,184,.35), 0 6px 18px rgba(2,6,23,.06);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.vpc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 6px 10px;
+  background: #eaf2ff;
+  border-bottom: 1px solid rgba(148,163,184,.45);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.vpc-icon { width: 20px; height: 20px; object-fit: contain; }
+.vpc-title { font-size: 13px; }
+
+.vpc-body {
+  position: absolute;
+  inset: 40px 0 0 0;
+}
+
+
+
+/* Font Awesome toolbar icons */
+.icon-fa {
+  font-size: 22px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: .85;
+}
+.icon-btn:hover .icon-fa, .icon-btn.active .icon-fa { opacity: 1; }
+
+
+/* Não bloquear interações do canvas/nodes ao sobrepor a VPC */
+.vpc-body { pointer-events: none; }
+
+/* Header arrastável */
+.vpc-header { cursor: move; user-select: none; }
+
+/* Handle de redimensionamento (canto inferior direito) */
+.vpc-resize {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  border-right: 2px solid rgba(15, 23, 42, .45);
+  border-bottom: 2px solid rgba(15, 23, 42, .45);
+  cursor: se-resize;
+  pointer-events: auto;
+}
+
+
+/* ===== Toolbar icon active + feedback ===== */
+.icon-btn .icon-fa {
+  transition: transform .08s ease, color .15s ease, opacity .12s ease;
+}
+
+/* Azul quando o botão está ativo/selecionado */
+.icon-btn.active .icon-fa {
+  color: #2563eb; /* blue-600 */
   opacity: 1;
-  color: #2b6fff;
 }
 
+/* Hover dá um leve realce */
+.icon-btn:hover .icon-fa {
+  transform: translateY(-1px);
+}
+
+/* Feedback de clique: desce e volta suavemente */
+.icon-btn:active .icon-fa {
+  transform: translateY(1px) scale(0.98);
+}
+
+
+/* ===== Camadas (z-index): VPC sempre atrás dos serviços ===== */
+.canvas .vpc-container { z-index: 1; }
+.canvas .node         { z-index: 2; }
+
+/* (Opcional) traz o nó um pouco mais à frente enquanto arrasta */
+.canvas .node.dragging { z-index: 3; }

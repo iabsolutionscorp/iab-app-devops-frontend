@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
+import { LocalstackNormalizerService } from '../../services/localstack-normalizer.service';
 
 @Injectable({ providedIn: 'root' })
 export class TerraformGeneratorService {
+  constructor(private localstack: LocalstackNormalizerService) {}
   /** Converte um objeto { resources: [...] } em código HCL */
   generate(config: any): string {
     let hcl = '';
