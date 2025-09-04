@@ -31,12 +31,14 @@ export class TerraformHclParserService {
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
       const type = m[1];
-      const name = m[2];
+      const rawName = m[2];
+      const name = this.normalizeName(rawName); // 🔥 normaliza aqui
       const bodyStart = re.lastIndex - 1; // pos do '{'
       const { body, endIndex } = this.captureBraces(src, bodyStart);
       re.lastIndex = endIndex;
 
       const parsed = this.parseBody(body);
+      const safeName = this.normalizeName(name);
       out.push({ type, name, properties: parsed.props, blocks: parsed.blocks });
     }
     return out;
@@ -172,4 +174,12 @@ export class TerraformHclParserService {
 
     return { props, blocks };
   }
+  private normalizeName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-') // troca tudo que não é permitido
+      .replace(/-+/g, '-')         // colapsa múltiplos hifens
+      .replace(/^-|-$/g, '');      // remove hifen no início/fim
+  }
+
 }

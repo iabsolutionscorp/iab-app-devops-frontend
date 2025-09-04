@@ -4,6 +4,7 @@
     [projectName]="projectName"
     (newArchitecture)="onNewArchitecture()"
     (projectNameChange)="onProjectNameChange($event)"
+    (deploy)="onDeploy($event)"
   ></app-topbar>
 
   <div class="body">
@@ -47,6 +48,7 @@
       <div class="terraform-wrapper dark" #terraformPane>
         <div class="title">Terraform Configuration</div>
         <app-terraform-preview
+          #tfPrev
           [configJson]="terraformJson"
           (liveConfig)="onLiveConfig($event)"
         ></app-terraform-preview>

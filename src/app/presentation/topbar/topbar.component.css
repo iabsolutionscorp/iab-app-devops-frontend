@@ -83,3 +83,43 @@
   object-fit: cover;
   border: 2px solid #ddd;
 }
+
+.aws-panel {
+  position: absolute;
+  right: 10px;
+  top: 50px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 250px;
+  z-index: 100;
+}
+
+.aws-panel label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: #333;
+}
+
+.aws-panel input {
+  margin-top: 4px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.aws-panel button {
+  margin-top: 6px;
+  background: #1c2533;
+  color: white;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

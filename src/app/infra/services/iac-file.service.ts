@@ -5,6 +5,7 @@ import { map, Observable } from 'rxjs';
 import {IacTypeEnum} from '../model/iac-type.enum';
 import {IacFileResponse} from '../model/iac-file-request.model';
 import {GenerateIacFileRequest} from '../model/generate-iac-file-request.model';
+import {AwsCredentialsRequest} from '../model/aws-credentials-request.model';
 
 @Injectable({ providedIn: 'root' })
 export class IacService {
@@ -27,28 +28,29 @@ export class IacService {
     );
   }
 
-  deploy$(id: number): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${id}/deploy`, null);
+  deploy$(id: string,
+          credentials: AwsCredentialsRequest): Observable<void> {
+    console.log("aqui: " +  id)
+    return this.http.post<void>(`${this.apiUrl}/${id}/deploy`, credentials);
   }
 
-  create$(fileName: string, type: IacTypeEnum, file: File): Observable<number> {
+  create$(fileName: string, type: IacTypeEnum, file: File): Observable<string> {
     const form = new FormData();
     form.append('fileName', fileName);
     form.append('type', String(type));
     form.append('file', file, file.name);
 
-    return this.http.post(`${this.apiUrl}`, form, {
-      observe: 'response',
-    }).pipe(
+    return this.http.post(`${this.apiUrl}`, form, { observe: 'response' }).pipe(
       map((res) => {
         const location = res.headers.get('Location') || res.headers.get('location');
-        if (!location) return NaN;
-        const idStr = location.substring(location.lastIndexOf('/') + 1);
-        const id = Number(idStr);
-        return Number.isFinite(id) ? id : NaN;
+        if (!location) {
+          return '';
+        }
+        return location.substring(location.lastIndexOf('/') + 1);
       })
     );
   }
+
 
   getById$(id: number): Observable<IacFileResponse> {
     return this.http.get<IacFileResponse>(`${this.apiUrl}/${id}`);

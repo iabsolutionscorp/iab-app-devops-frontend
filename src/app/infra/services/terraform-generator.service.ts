@@ -4,14 +4,26 @@ import { LocalstackNormalizerService } from '../../services/localstack-normalize
 @Injectable({ providedIn: 'root' })
 export class TerraformGeneratorService {
   constructor(private localstack: LocalstackNormalizerService) {}
+
   /** Converte um objeto { resources: [...] } em código HCL */
   generate(config: any): string {
     let hcl = '';
     if (Array.isArray(config.resources)) {
       for (const res of config.resources) {
-        hcl += `resource "${res.type}" "${res.name}" {\n`;
+        // 🔥 normaliza o identificador lógico do recurso
+        const safeName = this.normalizeName(res.name);
+
+        hcl += `resource "${res.type}" "${safeName}" {\n`;
         for (const [key, value] of Object.entries(res.properties || {})) {
-          hcl += this.renderProperty(key, value, 1);
+          let safeValue = value;
+
+          // 🔥 se for bucket, gera nome único e válido
+          if (typeof value === 'string' && key.toLowerCase() === 'bucket') {
+            const suffix = Math.random().toString(36).substring(2, 8); // gera string aleatória curta
+            safeValue = this.normalizeName(value) + '-' + suffix;
+          }
+
+          hcl += this.renderProperty(key, safeValue, 1);
         }
         hcl += `}\n\n`;
       }
@@ -36,5 +48,14 @@ export class TerraformGeneratorService {
       return `${indent}${key} = "${value}"\n`;
     }
     return `${indent}${key} = ${value}\n`;
+  }
+
+  /** Normaliza nomes para letras minúsculas + hífens */
+  private normalizeName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-') // troca inválidos por hífen
+      .replace(/-+/g, '-')         // evita hífens duplicados
+      .replace(/^-|-$/g, '');      // remove hífen no início/fim
   }
 }

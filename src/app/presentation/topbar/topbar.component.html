@@ -27,7 +27,25 @@
   </div>
 
   <div class="topbar-right">
-    <button class="template-btn">🗂 Deploy</button>
+    <button class="template-btn" (click)="toggleAwsPanel()">
+      🗂 Deploy
+    </button>
+
+    <!-- Painel retrátil -->
+    <div class="aws-panel" *ngIf="awsPanelOpen">
+      <label>
+        Access Key ID:
+        <input type="text" [(ngModel)]="awsAccessKeyId" />
+        Secret Access Key:
+        <input type="password" [(ngModel)]="awsSecretKey" />
+      </label>
+      <label>
+        Region:
+        <input type="text" [(ngModel)]="awsRegion" placeholder="ex: us-east-1" />
+      </label>
+      <button (click)="onDeploy()">Confirmar Deploy</button>
+    </div>
+
     <button class="new-arch-btn" (click)="onNewArchitectureClick()">
       ➕ Nova arquitetura
     </button>

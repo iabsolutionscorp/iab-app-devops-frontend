@@ -1,17 +1,18 @@
-import { Component, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HttpClientModule } from '@angular/common/http';
-import { TopbarComponent } from '../topbar/topbar.component';
-import { ServicePaletteComponent } from '../service-palette/service-palette.component';
-import { CanvasComponent } from '../canvas/canvas.component';
-import { TerraformPreviewComponent } from '../terraform-preview/terraform-preview.component';
-import { IaPromptComponent } from '../ia-prompt/ia-prompt';
-import { TerraformHclParserService } from '../../services/terraform-hcl-parser.service';
-import { IacService } from '../../infra/services/iac-file.service';
-import { GenerateIacFileRequest } from '../../infra/model/generate-iac-file-request.model';
-import { IacTypeEnum } from '../../infra/model/iac-type.enum';
+import {Component, ViewChild, ElementRef} from '@angular/core';
+import {CommonModule} from '@angular/common';
+import {HttpClientModule} from '@angular/common/http';
+import {TopbarComponent} from '../topbar/topbar.component';
+import {ServicePaletteComponent} from '../service-palette/service-palette.component';
+import {CanvasComponent} from '../canvas/canvas.component';
+import {TerraformPreviewComponent} from '../terraform-preview/terraform-preview.component';
+import {IaPromptComponent} from '../ia-prompt/ia-prompt';
+import {TerraformHclParserService} from '../../services/terraform-hcl-parser.service';
+import {IacService} from '../../infra/services/iac-file.service';
+import {GenerateIacFileRequest} from '../../infra/model/generate-iac-file-request.model';
+import {IacTypeEnum} from '../../infra/model/iac-type.enum';
 
-import { fromEvent, Subscription } from 'rxjs';
+import {fromEvent, Subscription} from 'rxjs';
+import {AwsCredentialsRequest} from '../../infra/model/aws-credentials-request.model';
 
 @Component({
   selector: 'app-workspace',
@@ -35,8 +36,9 @@ export class WorkspaceComponent {
   @ViewChild('canvas') canvas!: CanvasComponent;
 
   // refs para redimensionar painel direito
-  @ViewChild('mainContent', { static: true }) mainContent!: ElementRef<HTMLDivElement>;
-  @ViewChild('terraformPane', { static: true }) terraformPane!: ElementRef<HTMLDivElement>;
+  @ViewChild('mainContent', {static: true}) mainContent!: ElementRef<HTMLDivElement>;
+  @ViewChild('terraformPane', {static: true}) terraformPane!: ElementRef<HTMLDivElement>;
+  @ViewChild('tfPrev') tfPrev!: TerraformPreviewComponent;
 
   terraformJson: any = {};
 
@@ -51,7 +53,8 @@ export class WorkspaceComponent {
   promptResponse: string | null = null;
   promptError: string | null = null;
 
-  constructor(private iac: IacService, private hclParser: TerraformHclParserService) {}
+  constructor(private iac: IacService, private hclParser: TerraformHclParserService) {
+  }
 
   // ----- Resize handlers -----
   startResize(e: MouseEvent) {
@@ -83,7 +86,7 @@ export class WorkspaceComponent {
     if (!this.editorDirty) {
       this.promptResponse = value;
     }
-  }  
+  }
 
   // ----- Topbar actions -----
   onNewArchitecture() {
@@ -126,39 +129,39 @@ export class WorkspaceComponent {
       type: IacTypeEnum.TERRAFORM,
     } as any;
 
-      // return void (this.promptLoading = false, this.promptError = null, this.promptResponse = `terraform {
-      //   required_providers { aws = { source = "hashicorp/aws", version = "~> 5.0" } }
-      // }
-      
-      // variable "localstack_endpoint" { default = "http://localhost:4566" }
-      
-      // provider "aws" {
-      //   region                      = "sa-east-1"
-      //   s3_force_path_style         = true
-      //   skip_credentials_validation = true
-      //   skip_requesting_account_id  = true
-      //   skip_metadata_api_check     = true
-      //   endpoints = {
-      //     dynamodb = var.localstack_endpoint
-      //     glue     = var.localstack_endpoint
-      //     iam      = var.localstack_endpoint
-      //     sts      = var.localstack_endpoint
-      //     s3       = var.localstack_endpoint
-      //     ec2      = var.localstack_endpoint
-      //     ecs      = var.localstack_endpoint
-      //   }
-      // }
-      
-      // resource "aws_dynamodb_table" "dynamo_1" {
-      //   name         = "test-table"
-      //   billing_mode = "PAY_PER_REQUEST"
-      //   hash_key     = "id"
-      //   attribute { name = "id"; type = "S" }
-      // }
-      // `);     
+    // return void (this.promptLoading = false, this.promptError = null, this.promptResponse = `terraform {
+    //   required_providers { aws = { source = "hashicorp/aws", version = "~> 5.0" } }
+    // }
+
+    // variable "localstack_endpoint" { default = "http://localhost:4566" }
+
+    // provider "aws" {
+    //   region                      = "sa-east-1"
+    //   s3_force_path_style         = true
+    //   skip_credentials_validation = true
+    //   skip_requesting_account_id  = true
+    //   skip_metadata_api_check     = true
+    //   endpoints = {
+    //     dynamodb = var.localstack_endpoint
+    //     glue     = var.localstack_endpoint
+    //     iam      = var.localstack_endpoint
+    //     sts      = var.localstack_endpoint
+    //     s3       = var.localstack_endpoint
+    //     ec2      = var.localstack_endpoint
+    //     ecs      = var.localstack_endpoint
+    //   }
+    // }
+
+    // resource "aws_dynamodb_table" "dynamo_1" {
+    //   name         = "test-table"
+    //   billing_mode = "PAY_PER_REQUEST"
+    //   hash_key     = "id"
+    //   attribute { name = "id"; type = "S" }
+    // }
+    // `);
 
     this.iac.generateCode$(req).subscribe({
-      next: ({ blob, filename }) => {
+      next: ({blob, filename}) => {
         blob.text()
           .then((txt) => {
             this.promptLoading = false;
@@ -191,10 +194,10 @@ export class WorkspaceComponent {
     try {
       // 1) interpreta o HCL retornado pela IA em JSON
       const parsed = this.hclParser.parse(this.promptResponse);
-  
+
       // 2) atualiza o preview da direita (vai renderizar o HCL a partir do JSON)
       this.terraformJson = parsed;
-  
+
       // 3) aplica no canvas (recria os serviços/links automaticamente)
       this.canvas.loadFromConfig(this.terraformJson);
       this.editorDirty = false;
@@ -202,5 +205,10 @@ export class WorkspaceComponent {
       console.error('onPromptReplace parse error:', e);
       this.promptError = 'Não consegui interpretar o Terraform retornado pela IA.';
     }
-  }  
+  }
+
+  onDeploy(creds: AwsCredentialsRequest) {
+    if (!this.terraformJson) return;
+    this.tfPrev.deployWithCredentials(this.tfPrev.hclText, creds);
+  }
 }

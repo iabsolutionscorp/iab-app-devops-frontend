@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import {IacService} from '../../infra/services/iac-file.service';
+import {AwsCredentialsRequest} from '../../infra/model/aws-credentials-request.model';
 
 @Component({
   selector: 'app-topbar',
@@ -24,11 +26,16 @@ export class TopbarComponent {
   /** Emite ao confirmar “Nova arquitetura” */
   @Output() newArchitecture = new EventEmitter<void>();
 
+  @Output() deploy = new EventEmitter<AwsCredentialsRequest>();
+
   /** Se está no modo edição */
   editingName = false;
 
   /** Referência ao input */
   @ViewChild('projectNameInput') projectNameInput!: ElementRef<HTMLInputElement>;
+
+  constructor(private iacFileService: IacService) {
+  }
 
   onNewArchitectureClick() {
     const confirmed = window.confirm(
@@ -55,5 +62,24 @@ export class TopbarComponent {
     const name = this.projectName.trim() || 'novo projeto';
     this.projectName = name;
     this.projectNameChange.emit(name);
+  }
+
+  awsPanelOpen = false;
+  awsSecretKey = '';
+  awsAccessKeyId = '';
+  awsRegion = '';
+
+  toggleAwsPanel() {
+    this.awsPanelOpen = !this.awsPanelOpen;
+  }
+
+
+  onDeploy() {
+    this.deploy.emit({
+      accessKeyId: this.awsAccessKeyId.trim(),
+      secretAccessKey: this.awsSecretKey.trim(),
+      region: this.awsRegion.trim()
+    });
+    this.awsPanelOpen = false;
   }
 }
